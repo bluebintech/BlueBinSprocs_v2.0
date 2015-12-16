@@ -20,6 +20,7 @@ sb.LocationID,
 dl.LocationName as LocationName,
 sl.ItemID,
 di.ItemDescription,
+sl.Qty,
 sl.Line,
 sb.ScanDateTime as [DateScanned]
 

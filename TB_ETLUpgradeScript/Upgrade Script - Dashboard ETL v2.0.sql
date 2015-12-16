@@ -116,7 +116,22 @@ CREATE TABLE [etl].[JobSteps](
 	[ActiveFlag] [int] NOT NULL,
 	[LastModifiedDate] [datetime] NULL
 ) ON [PRIMARY]
-
+;  select * from etl.JobSteps 
+insert into etl.JobSteps (StepNumber,StepName,StepProcedure,StepTable,ActiveFlag,LastModifiedDate) VALUES
+('1','DimItem','etl_DimItem','bluebin.DimItem',0,getdate()),
+('2','DimLocation','etl_DimLocation','bluebin.DimLocation',0,getdate()),
+('3','DimDate','etl_DimDate','bluebin.DimDate',0,getdate()),
+('4','DimBinStatus','etl_DimBinStatus','bluebin.DimBinStatus',0,getdate()),
+('5','DimBin','etl_DimBin','bluebin.DimBin',0,getdate()),
+('6','FactScan','etl_FactScan','bluebin.FactScan',0,getdate()),
+('7','FactBinSnapshot','etl_FactBinSnapshot','bluebin.FactBinSnapshot',0,getdate()),
+('9','FactIssue','etl_FactIssue','bluebin.FactIssue',0,getdate()),
+('10','FactWarehouseSnapshot','etl_FactWarehouseSnapshot','bluebin.FactWarehouseSnapshot',0,getdate()),
+('11','Kanban','tb_Kanban','tableau.Kanban',0,getdate()),
+('12','Sourcing','tb_Sourcing','tableau.Sourcing',0,getdate()),
+('13','Contracts','tb_Contracts','tableau.Contracts',0,getdate()),
+('8','Update Bin Status','etl_UpdateBinStatus','bluebin.DimBin',0,getdate()),
+('14','Warehouse Item','etl_DimWarehouseItem','bluebin.DimWarehouseItem',0,getdate())
 END
 GO
 
@@ -177,7 +192,8 @@ CREATE PROCEDURE etl_DimItem
 AS
 
 /**************		SET BUSINESS RULES		***************/
-DECLARE @PrimaryLocation varchar(50) = 'STORE'
+DECLARE @PrimaryLocation varchar(50) 
+select @PrimaryLocation = ConfigValue from bluebin.Config where ConfigName = 'LOCATION'
 
 
 
@@ -561,13 +577,13 @@ FROM   ITEMLOC
        LEFT JOIN ICCATEGORY
               ON ITEMLOC.GL_CATEGORY = ICCATEGORY.GL_CATEGORY
                  AND ITEMLOC.LOCATION = ICCATEGORY.LOCATION
-WHERE  ITEMLOC.LOCATION = 'STORE'
+WHERE  ITEMLOC.LOCATION in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
 
 SELECT ITEM,
        LAST_ISS_COST
 INTO   #ItemStore
 FROM   ITEMLOC
-WHERE  LOCATION = 'STORE'
+WHERE  LOCATION in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
 
 
 /***********************************		CREATE	DimBin		***********************************/
@@ -1636,7 +1652,10 @@ END TRY
 BEGIN CATCH
 END CATCH
 
-SELECT b.ItemKey,
+SELECT 
+		d.LocationID,
+		d.LocationName,
+		b.ItemKey,
        b.ItemID,
        b.ItemDescription,
        b.ItemClinicalDescription,
@@ -1648,6 +1667,7 @@ SELECT b.ItemKey,
        a.SOH_QTY       AS SOHQty,
        a.MAX_ORDER     AS ReorderQty,
        a.REORDER_POINT AS ReorderPoint,
+	   a.LAST_ISS_COST	AS UnitCost,
        b.StockUOM,
        b.BuyUOM,
        b.PackageString
@@ -1659,14 +1679,18 @@ FROM   ITEMLOC a
                ON a.COMPANY = c.COMPANY
                   AND a.LOCATION = c.LOCATION
                   AND a.GL_CATEGORY = c.GL_CATEGORY
-WHERE  a.LOCATION = 'STORE' 
+		INNER JOIN bluebin.DimLocation d
+		ON a.LOCATION = d.LocationID
+		INNER JOIN ICLOCATION e
+		ON a.COMPANY = e.COMPANY
+		AND a.LOCATION = e.LOCATION
+WHERE e.LOCATION_TYPE <> 'P'
+ 
 GO
 
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'Warehouse Item'
-GO
-
 
 Print 'ETL Sprocs updated'
 GO
@@ -1766,7 +1790,7 @@ FROM   POLINE c
                ON c.ITEM = f.ITEM
        LEFT JOIN (SELECT *
                   FROM   ITEMLOC
-                  WHERE  LOCATION = 'STORE') g
+                  WHERE  LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')) g
               ON c.ITEM = g.ITEM
        LEFT JOIN ICCATEGORY h
               ON g.COMPANY = h.COMPANY
@@ -2533,6 +2557,7 @@ GO
 --*********************************************************************************************
 
 
+
 if exists (select * from dbo.sysobjects where id = object_id(N'tb_JobStatus') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure tb_JobStatus
 GO
@@ -2570,6 +2595,7 @@ END
 GO
 grant exec on tb_JobStatus to public
 GO
+
 
 
 

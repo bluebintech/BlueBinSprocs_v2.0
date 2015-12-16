@@ -21,11 +21,13 @@ sb.ScanDateTime as [DateScanned]
 from scan.ScanBatch sb
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
 inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
+
 group by 
 sb.ScanBatchID,
 sb.LocationID,
 dl.LocationName,
 sb.ScanDateTime
+order by sb.ScanDateTime desc
 
 END
 GO

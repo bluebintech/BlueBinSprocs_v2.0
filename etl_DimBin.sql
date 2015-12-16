@@ -62,13 +62,13 @@ FROM   ITEMLOC
        LEFT JOIN ICCATEGORY
               ON ITEMLOC.GL_CATEGORY = ICCATEGORY.GL_CATEGORY
                  AND ITEMLOC.LOCATION = ICCATEGORY.LOCATION
-WHERE  ITEMLOC.LOCATION = 'STORE'
+WHERE  ITEMLOC.LOCATION in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
 
 SELECT ITEM,
        LAST_ISS_COST
 INTO   #ItemStore
 FROM   ITEMLOC
-WHERE  LOCATION = 'STORE'
+WHERE  LOCATION in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
 
 
 /***********************************		CREATE	DimBin		***********************************/

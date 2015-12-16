@@ -12,8 +12,8 @@ CREATE PROCEDURE etl_DimItem
 AS
 
 /**************		SET BUSINESS RULES		***************/
-DECLARE @PrimaryLocation varchar(50) = 'STORE'
-
+DECLARE @PrimaryLocation varchar(50) 
+select @PrimaryLocation = ConfigValue from bluebin.Config where ConfigName = 'LOCATION'
 
 
 /**************		DROP DimItem			***************/

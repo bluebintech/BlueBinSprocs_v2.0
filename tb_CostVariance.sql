@@ -34,7 +34,7 @@ FROM   POLINE c
                ON c.ITEM = f.ITEM
        LEFT JOIN (SELECT *
                   FROM   ITEMLOC
-                  WHERE  LOCATION = 'STORE') g
+                  WHERE  LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')) g
               ON c.ITEM = g.ITEM
        LEFT JOIN ICCATEGORY h
               ON g.COMPANY = h.COMPANY

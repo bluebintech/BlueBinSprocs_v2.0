@@ -99,7 +99,7 @@ if not exists (select * from sys.tables where name = 'ScanBatch')
 BEGIN
 CREATE TABLE [scan].[ScanBatch](
 	[ScanBatchID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
-	[LocationID] char(5) NOT NULL,
+	[LocationID] char(7) NOT NULL,
 	[BlueBinUserID] int NOT NULL,
 	[Active] int NOT NULL,
 	[ScanDateTime] datetime not null
@@ -539,6 +539,7 @@ GO
 --**************************SPROC**********************
 
 
+
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertScanLine') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_InsertScanLine
 GO
@@ -559,7 +560,9 @@ CREATE PROCEDURE sp_InsertScanLine
 AS
 BEGIN
 SET NOCOUNT ON
- 
+
+if exists (select * from bluebin.DimItem where ItemID = @Item) 
+BEGIN
 insert into scan.ScanLine
 	select 
 	@ScanBatchID,
@@ -568,6 +571,13 @@ insert into scan.ScanLine
 	@Qty,
 	1,
 	getdate()
+END
+	ELSE
+	BEGIN
+	SELECT -1 -- Must Change Password
+	delete from scan.ScanLine where ScanBatchID = @ScanBatchID
+	delete from scan.ScanBatch where ScanBatchID = @ScanBatchID
+	END
 
 END
 GO
@@ -622,6 +632,7 @@ GO
 --**************************SPROC**********************
 
 
+
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanBatch') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_SelectScanBatch
 GO
@@ -644,11 +655,13 @@ sb.ScanDateTime as [DateScanned]
 from scan.ScanBatch sb
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
 inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
+
 group by 
 sb.ScanBatchID,
 sb.LocationID,
 dl.LocationName,
 sb.ScanDateTime
+order by sb.ScanDateTime desc
 
 END
 GO
@@ -656,8 +669,10 @@ grant exec on sp_SelectScanBatch to public
 GO
 
 
+
 --*****************************************************
 --**************************SPROC**********************
+
 
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanLines') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_SelectScanLines
@@ -698,6 +713,7 @@ END
 GO
 grant exec on sp_SelectScanLines to public
 GO
+
 
 
 --*****************************************************
