@@ -85,6 +85,13 @@ update bluebin.Config set ConfigType = 'DMS' where ConfigName not in ('REQ_LOCAT
 update bluebin.Config set ConfigType = 'Tableau' where ConfigName in ('REQ_LOCATION','LOCATION','TableauURL');
 END
 GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'SingleCompany')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType)
+select 'SingleCompany','0',1,getdate(),'Tableau'
+END
+GO
 Print 'Table Updates Complete'
 --*************************************************************************************************************************************************
 --Table Adds
@@ -102,6 +109,7 @@ CREATE TABLE [scan].[ScanBatch](
 	[LocationID] char(7) NOT NULL,
 	[BlueBinUserID] int NOT NULL,
 	[Active] int NOT NULL,
+	[Extracted] int NOT NULL,
 	[ScanDateTime] datetime not null
 )
 END
@@ -121,6 +129,7 @@ CREATE TABLE [scan].[ScanLine](
 	[ItemID] char (32) NOT NULL,
 	[Qty] int NOT NULL,
 	[Active] int NOT NULL,
+	[Extracted] int NOT NULL,
     [ScanDateTime] datetime NOT NULL
 )
 
@@ -545,6 +554,8 @@ drop procedure sp_InsertScanLine
 GO
 
 /* 
+select * from scan.ScanLine
+select * from scan.ScanBatch
 exec sp_InsertScanLine 1,'0001217','20',1
 exec sp_InsertScanLine 1,'0001218','5',2
 exec sp_InsertScanLine 1,'0002205','100',3
@@ -563,14 +574,15 @@ SET NOCOUNT ON
 
 if exists (select * from bluebin.DimItem where ItemID = @Item) 
 BEGIN
-insert into scan.ScanLine
+insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extracted)
 	select 
 	@ScanBatchID,
 	@Line,
 	@Item,
 	@Qty,
-	1,
-	getdate()
+	1,--Active Default to Yes
+	getdate(),
+	0 --Extracted default to No
 END
 	ELSE
 	BEGIN
@@ -609,12 +621,13 @@ AS
 BEGIN
 SET NOCOUNT ON
 
-insert into scan.ScanBatch
+insert into scan.ScanBatch (LocationID,BlueBinUserID,Active,ScanDateTime,Extracted)
 select 
 @Location,
 (select BlueBinUserID from bluebin.BlueBinUser where UserLogin = @Scanner),
-1,
-getdate()
+1, --Default Active to Yes
+getdate(),
+0 --Default Extracted to No
 
 Declare @ScanBatchID int  = SCOPE_IDENTITY()
 
@@ -650,7 +663,8 @@ sb.ScanBatchID,
 sb.LocationID,
 dl.LocationName as LocationName,
 max(sl.Line) as BinsScanned,
-sb.ScanDateTime as [DateScanned]
+sb.ScanDateTime as [DateScanned],
+case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
 
 from scan.ScanBatch sb
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
@@ -660,7 +674,8 @@ group by
 sb.ScanBatchID,
 sb.LocationID,
 dl.LocationName,
-sb.ScanDateTime
+sb.ScanDateTime,
+sb.Extracted
 order by sb.ScanDateTime desc
 
 END
@@ -697,7 +712,8 @@ sl.ItemID,
 di.ItemDescription,
 sl.Qty,
 sl.Line,
-sb.ScanDateTime as [DateScanned]
+sb.ScanDateTime as [DateScanned],
+case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
 
 from scan.ScanLine sl
 inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID

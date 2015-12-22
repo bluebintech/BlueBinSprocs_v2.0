@@ -24,7 +24,8 @@ SELECT DISTINCT
          OVER(
            ORDER BY [LocationId]) AS LocationKey,
        [LocationId]               AS LocationID,
-       [LocationName]             AS LocationName,
+--       [LocationId]             AS LocationName,
+       [LocationId]             AS LocationName,
        'Caldwell'                   AS LocationFacility,
        CASE
          WHEN LEFT([LocationId], 2) IN (SELECT [ConfigValue]

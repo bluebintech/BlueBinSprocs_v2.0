@@ -16,7 +16,8 @@ sb.ScanBatchID,
 sb.LocationID,
 dl.LocationName as LocationName,
 max(sl.Line) as BinsScanned,
-sb.ScanDateTime as [DateScanned]
+sb.ScanDateTime as [DateScanned],
+case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
 
 from scan.ScanBatch sb
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
@@ -26,7 +27,8 @@ group by
 sb.ScanBatchID,
 sb.LocationID,
 dl.LocationName,
-sb.ScanDateTime
+sb.ScanDateTime,
+sb.Extracted
 order by sb.ScanDateTime desc
 
 END

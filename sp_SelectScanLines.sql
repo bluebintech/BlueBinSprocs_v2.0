@@ -22,7 +22,8 @@ sl.ItemID,
 di.ItemDescription,
 sl.Qty,
 sl.Line,
-sb.ScanDateTime as [DateScanned]
+sb.ScanDateTime as [DateScanned],
+case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
 
 from scan.ScanLine sl
 inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID

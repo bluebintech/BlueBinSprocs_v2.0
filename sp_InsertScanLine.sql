@@ -22,14 +22,15 @@ SET NOCOUNT ON
 
 if exists (select * from bluebin.DimItem where ItemID = @Item) 
 BEGIN
-insert into scan.ScanLine
+insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extracted)
 	select 
 	@ScanBatchID,
 	@Line,
 	@Item,
 	@Qty,
-	1,
-	getdate()
+	1,--Active Default to Yes
+	getdate(),
+	0 --Extracted default to No
 END
 	ELSE
 	BEGIN

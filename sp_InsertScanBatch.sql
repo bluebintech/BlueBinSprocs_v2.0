@@ -19,12 +19,13 @@ AS
 BEGIN
 SET NOCOUNT ON
 
-insert into scan.ScanBatch
+insert into scan.ScanBatch (LocationID,BlueBinUserID,Active,ScanDateTime,Extracted)
 select 
 @Location,
 (select BlueBinUserID from bluebin.BlueBinUser where UserLogin = @Scanner),
-1,
-getdate()
+1, --Default Active to Yes
+getdate(),
+0 --Default Extracted to No
 
 Declare @ScanBatchID int  = SCOPE_IDENTITY()
 

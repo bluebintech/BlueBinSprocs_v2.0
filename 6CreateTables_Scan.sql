@@ -1,6 +1,5 @@
 
 
-
 SET ANSI_NULLS ON
 GO
 
@@ -19,6 +18,7 @@ CREATE TABLE [scan].[ScanBatch](
 	[LocationID] char(7) NOT NULL,
 	[BlueBinUserID] int NOT NULL,
 	[Active] int NOT NULL,
+	[Extracted] int NOT NULL,
 	[ScanDateTime] datetime not null
 )
 END
@@ -35,6 +35,7 @@ CREATE TABLE [scan].[ScanLine](
 	[ItemID] char (32) NOT NULL,
 	[Qty] int NOT NULL,
 	[Active] int NOT NULL,
+	[Extracted] int NOT NULL,
     [ScanDateTime] datetime NOT NULL
 )
 
