@@ -36,6 +36,7 @@ CREATE TABLE [bluebin].[Config](
 
 insert into bluebin.Config (ConfigName,ConfigValue,ConfigType,Active,LastUpdated)
 VALUES
+('TrainingTitle','Tech','DMS',1,getdate()),
 ('BlueBinHardwareCustomer','Demo','DMS',1,getdate()),
 ('TimeOffset','3','DMS',1,getdate()),
 ('CustomerImage','BlueBin_Logo.png','DMS',1,getdate()),
@@ -45,6 +46,7 @@ VALUES
 ('SiteAppURL','BlueBinOperations_Demo','DMS',1,getdate()),
 ('TableaURL','/bluebinanalytics/views/Demo/','Tableau',1,getdate()),
 ('LOCATION','STORE','Tableau',1,getdate())
+
 END
 GO
 
@@ -160,5 +162,41 @@ CREATE TABLE [bluebin].[Image](
 END
 GO
 
+if not exists (select * from sys.tables where name = 'BlueBinTraining')
+BEGIN
+CREATE TABLE [bluebin].[BlueBinTraining](
+	[BlueBinTrainingID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	[BlueBinResourceID] INT NOT NULL,
+	[Form3000] varchar(10) not null,
+		[Form3001] varchar(10) not null,
+			[Form3002] varchar(10) not null,
+				[Form3003] varchar(10) not null,
+					[Form3004] varchar(10) not null,
+						[Form3005] varchar(10) not null,
+							[Form3006] varchar(10) not null,
+								[Form3007] varchar(10) not null,
+									[Form3008] varchar(10) not null,
+										[Form3009] varchar(10) not null,
+											[Form3010] varchar(10) not null,
+	[Active] int not null,
+	[BlueBinUserID] int NULL,
+	[LastUpdated] datetime not null
+)
+;
+ALTER TABLE [bluebin].[BlueBinTraining] WITH CHECK ADD FOREIGN KEY([BlueBinResourceID])
+REFERENCES [bluebin].[BlueBinResource] ([BlueBinResourceID])
+;
+ALTER TABLE [bluebin].[BlueBinTraining] WITH CHECK ADD FOREIGN KEY([BlueBinUserID])
+REFERENCES [bluebin].[BlueBinUser] ([BlueBinUserID])
+;
+insert into [bluebin].[BlueBinTraining]
+select BlueBinResourceID,'No','No','No','No','No','No','No','No','No','No','No',1,NULL,getdate()
+from bluebin.BlueBinResource
+where BlueBinResourceID not in (select BlueBinResourceID from bluebin.BlueBinTraining)
+	and Title in (select ConfigValue from bluebin.Config where ConfigName = 'TrainingTitle')
+END
+GO
+
 SET ANSI_PADDING OFF
 GO
+

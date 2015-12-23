@@ -20,11 +20,26 @@ AS
 BEGIN
 SET NOCOUNT ON
 if exists(select * from bluebin.BlueBinResource where FirstName = @FirstName and LastName = @LastName and [Login] = @Login)
-BEGIN
-GOTO THEEND
-END
+	BEGIN
+		if not exists (select * from bluebin.BlueBinTraining where BlueBinResourceID in (select BlueBinResourceID from bluebin.BlueBinResource where FirstName = @FirstName and LastName = @LastName and [Login] = @Login))
+		BEGIN
+		insert into [bluebin].[BlueBinTraining]
+			select BlueBinResourceID,'No','No','No','No','No','No','No','No','No','No','No',1,NULL,getdate()
+			from bluebin.BlueBinResource
+			where FirstName = @FirstName and LastName = @LastName and [Login] = @Login
+			and Title in (select ConfigValue from bluebin.Config where ConfigName = 'TrainingTitle')
+		END
+		GOTO THEEND
+	END
+;
 insert into bluebin.BlueBinResource (FirstName,LastName,MiddleName,[Login],Email,Phone,Cell,Title,Active,LastUpdated) 
 VALUES (@FirstName,@LastName,@MiddleName,@Login,@Email,@Phone,@Cell,@Title,1,getdate())
+;
+insert into [bluebin].[BlueBinTraining]
+		select BlueBinResourceID,'No','No','No','No','No','No','No','No','No','No','No',1,NULL,getdate()
+		from bluebin.BlueBinResource
+		where FirstName = @FirstName and LastName = @LastName and [Login] = @Login
+		and Title in (select ConfigValue from bluebin.Config where ConfigName = 'TrainingTitle')
 
 END
 THEEND:
@@ -32,3 +47,4 @@ THEEND:
 GO
 grant exec on sp_InsertBlueBinResource to appusers
 GO
+

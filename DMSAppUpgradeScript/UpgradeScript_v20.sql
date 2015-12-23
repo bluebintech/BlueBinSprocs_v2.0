@@ -86,16 +86,55 @@ update bluebin.Config set ConfigType = 'Tableau' where ConfigName in ('REQ_LOCAT
 END
 GO
 
-if not exists(select * from bluebin.Config where ConfigName = 'SingleCompany')  
+if not exists(select * from bluebin.Config where ConfigName = 'TrainingTitle')  
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType)
-select 'SingleCompany','0',1,getdate(),'Tableau'
+select 'TrainingTitle','Tech',1,getdate(),'DMS'
 END
 GO
 Print 'Table Updates Complete'
 --*************************************************************************************************************************************************
 --Table Adds
 --*************************************************************************************************************************************************
+
+--*****************************************************
+--**************************NEWTABLE**********************
+
+/****** Object:  Table [bluebin].[BlueBinTraining]     ******/
+if not exists (select * from sys.tables where name = 'BlueBinTraining')
+BEGIN
+CREATE TABLE [bluebin].[BlueBinTraining](
+	[BlueBinTrainingID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	[BlueBinResourceID] INT NOT NULL,
+	[Form3000] varchar(10) not null,
+		[Form3001] varchar(10) not null,
+			[Form3002] varchar(10) not null,
+				[Form3003] varchar(10) not null,
+					[Form3004] varchar(10) not null,
+						[Form3005] varchar(10) not null,
+							[Form3006] varchar(10) not null,
+								[Form3007] varchar(10) not null,
+									[Form3008] varchar(10) not null,
+										[Form3009] varchar(10) not null,
+											[Form3010] varchar(10) not null,
+	[Active] int not null,
+	[BlueBinUserID] int NULL,
+	[LastUpdated] datetime not null
+)
+;
+ALTER TABLE [bluebin].[BlueBinTraining] WITH CHECK ADD FOREIGN KEY([BlueBinResourceID])
+REFERENCES [bluebin].[BlueBinResource] ([BlueBinResourceID])
+;
+ALTER TABLE [bluebin].[BlueBinTraining] WITH CHECK ADD FOREIGN KEY([BlueBinUserID])
+REFERENCES [bluebin].[BlueBinUser] ([BlueBinUserID])
+;
+insert into [bluebin].[BlueBinTraining]
+select BlueBinResourceID,'No','No','No','No','No','No','No','No','No','No','No',1,NULL,getdate()
+from bluebin.BlueBinResource
+where BlueBinResourceID not in (select BlueBinResourceID from bluebin.BlueBinTraining)
+	and Title in (select ConfigValue from bluebin.Config where ConfigName = 'TrainingTitle')
+END
+GO
 
 --*****************************************************
 --**************************NEWTABLE**********************
@@ -172,6 +211,7 @@ CREATE TABLE [bluebin].[Config](
 ;
 insert into bluebin.Config (ConfigName,ConfigValue,ConfigType,Active,LastUpdated)
 VALUES
+('TrainingTitle','Tech','DMS',1,getdate()),
 ('BlueBinHardwareCustomer','Demo','DMS',1,getdate()),
 ('TimeOffset','3','DMS',1,getdate()),
 ('CustomerImage','BlueBin_Logo.png','DMS',1,getdate()),
@@ -490,6 +530,56 @@ Print 'Table Adds Complete'
 --*************************************************************************************************************************************************
 --Sproc Updates
 --*************************************************************************************************************************************************
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectBlueBinTraining') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectBlueBinTraining
+GO
+
+
+CREATE PROCEDURE sp_SelectBlueBinTraining 
+@Name varchar (30)
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+SELECT 
+bbt.[BlueBinTrainingID],
+bbt.[BlueBinResourceID], 
+bbr.[LastName] + ', ' +bbr.[FirstName] as ResourceName, 
+bbr.Title,
+bbt.[Form3000],
+		bbt.[Form3001],
+			bbt.[Form3002],
+				bbt.[Form3003],
+					bbt.[Form3004],
+						bbt.[Form3005],
+							bbt.[Form3006],
+								bbt.[Form3007],
+									bbt.[Form3008],
+										bbt.[Form3009],
+											bbt.[Form3010],
+ISNULL((bbu.[LastName] + ', ' +bbu.[FirstName]),'N/A') as Updater,
+bbt.LastUpdated
+
+FROM [bluebin].[BlueBinTraining] bbt
+inner join [bluebin].[BlueBinResource] bbr on bbt.[BlueBinResourceID] = bbr.[BlueBinResourceID]
+left join [bluebin].[BlueBinUser] bbu on bbt.[BlueBinUserID] = bbu.[BlueBinUserID]
+
+Where 
+bbt.Active = 1 and 
+(bbr.[LastName] like '%' + @Name + '%' 
+	OR bbr.[FirstName] like '%' + @Name + '%')  
+	
+ORDER BY bbr.[LastName]
+END
+
+GO
+grant exec on sp_SelectBlueBinTraining to appusers
+GO
 
 --*****************************************************
 --**************************SPROC**********************
@@ -1328,6 +1418,148 @@ GO
 
 --*****************************************************
 --**************************SPROC**********************
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertBlueBinTraining') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_InsertBlueBinTraining
+GO
+
+--exec sp_InsertBlueBinTraining 'Butler, Gerry ()','Yes','No','No','No','No','No','No','No','No','No','No','gbutler@bluebin.com'
+
+
+CREATE PROCEDURE sp_InsertBlueBinTraining
+@BlueBinResource varchar(255), 
+@Form3000 varchar(10),
+@Form3001 varchar(10),
+@Form3002 varchar(10),
+@Form3003 varchar(10),
+@Form3004 varchar(10),
+@Form3005 varchar(10),
+@Form3006 varchar(10),
+@Form3007 varchar(10),
+@Form3008 varchar(10),
+@Form3009 varchar(10),
+@Form3010 varchar(10),
+@Updater varchar(255)
+
+--WITH ENCRYPTION 
+AS
+BEGIN
+SET NOCOUNT ON
+
+if not exists (select * from bluebin.BlueBinTraining where BlueBinResourceID in (select BlueBinResourceID from bluebin.BlueBinResource where LastName + ', ' + FirstName  = @BlueBinResource))
+	BEGIN
+	insert into [bluebin].[BlueBinTraining]
+	select 
+	(select BlueBinResourceID from bluebin.BlueBinResource where LastName + ', ' + FirstName  = @BlueBinResource),
+	@Form3000,
+	@Form3001,
+	@Form3002,
+	@Form3003,
+	@Form3004,
+	@Form3005,
+	@Form3006,
+	@Form3007,
+	@Form3008,
+	@Form3009,
+	@Form3010,
+	1, --Default Active to Yes
+	(select BlueBinUserID from bluebin.BlueBinUser where UserLogin = @Updater),
+	getdate()
+
+	;
+	declare @BlueBinTrainingID int
+	SET @BlueBinTrainingID = SCOPE_IDENTITY()
+		exec sp_InsertMasterLog @Updater,'Training','New Training Record Entered',@BlueBinTrainingID
+	END
+END
+GO
+
+grant exec on sp_InsertBlueBinTraining to appusers
+GO
+
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_DeleteBlueBinTraining') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_DeleteBlueBinTraining
+GO
+
+CREATE PROCEDURE sp_DeleteBlueBinTraining
+@BlueBinTrainingID int
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+Update [bluebin].[BlueBinTraining] set [Active] = 0, [LastUpdated] = getdate() where BlueBinTrainingID = @BlueBinTrainingID
+
+END
+GO
+grant exec on sp_DeleteBlueBinTraining to appusers
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_EditBlueBinTraining') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_EditBlueBinTraining
+GO
+
+--exec sp_EditBlueBinTraining '2','Yes','Yes','Yes','No','No','No','No','No','No','No','No','gbutler@bluebin.com'
+--select * from [bluebin].[BlueBinTraining]
+
+
+CREATE PROCEDURE sp_EditBlueBinTraining
+@BlueBinTrainingID int, 
+@Form3000 varchar(10),
+@Form3001 varchar(10),
+@Form3002 varchar(10),
+@Form3003 varchar(10),
+@Form3004 varchar(10),
+@Form3005 varchar(10),
+@Form3006 varchar(10),
+@Form3007 varchar(10),
+@Form3008 varchar(10),
+@Form3009 varchar(10),
+@Form3010 varchar(10),
+@Updater varchar(255)
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+
+update [bluebin].[BlueBinTraining]
+set
+	Form3000 = @Form3000,
+	Form3001 = @Form3001,
+	Form3002 = @Form3002,
+	Form3003 = @Form3003,
+	Form3004 = @Form3004,
+	Form3005 = @Form3005,
+	Form3006 = @Form3006,
+	Form3007 = @Form3007,
+	Form3008 = @Form3008,
+	Form3009 = @Form3009,
+	Form3010 = @Form3010,
+	BlueBinUserID = (select BlueBinUserID from bluebin.BlueBinUser where UserLogin = @Updater),
+	LastUpdated = getdate()
+where BlueBinTrainingID = @BlueBinTrainingID
+	;
+exec sp_InsertMasterLog @Updater,'Training','Training Record Updated',@BlueBinTrainingID
+END
+GO
+
+grant exec on sp_EditBlueBinTraining to appusers
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertBlueBinResource') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_InsertBlueBinResource
 GO
@@ -1350,11 +1582,26 @@ AS
 BEGIN
 SET NOCOUNT ON
 if exists(select * from bluebin.BlueBinResource where FirstName = @FirstName and LastName = @LastName and [Login] = @Login)
-BEGIN
-GOTO THEEND
-END
+	BEGIN
+		if not exists (select * from bluebin.BlueBinTraining where BlueBinResourceID in (select BlueBinResourceID from bluebin.BlueBinResource where FirstName = @FirstName and LastName = @LastName and [Login] = @Login))
+		BEGIN
+		insert into [bluebin].[BlueBinTraining]
+			select BlueBinResourceID,'No','No','No','No','No','No','No','No','No','No','No',1,NULL,getdate()
+			from bluebin.BlueBinResource
+			where FirstName = @FirstName and LastName = @LastName and [Login] = @Login
+			and Title in (select ConfigValue from bluebin.Config where ConfigName = 'TrainingTitle')
+		END
+		GOTO THEEND
+	END
+;
 insert into bluebin.BlueBinResource (FirstName,LastName,MiddleName,[Login],Email,Phone,Cell,Title,Active,LastUpdated) 
 VALUES (@FirstName,@LastName,@MiddleName,@Login,@Email,@Phone,@Cell,@Title,1,getdate())
+;
+insert into [bluebin].[BlueBinTraining]
+		select BlueBinResourceID,'No','No','No','No','No','No','No','No','No','No','No',1,NULL,getdate()
+		from bluebin.BlueBinResource
+		where FirstName = @FirstName and LastName = @LastName and [Login] = @Login
+		and Title in (select ConfigValue from bluebin.Config where ConfigName = 'TrainingTitle')
 
 END
 THEEND:
@@ -1362,6 +1609,8 @@ THEEND:
 GO
 grant exec on sp_InsertBlueBinResource to appusers
 GO
+
+
 
 --*****************************************************
 --**************************SPROC**********************
