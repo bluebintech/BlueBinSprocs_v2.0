@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertBlueBinT
 drop procedure sp_InsertBlueBinTraining
 GO
 
---exec sp_InsertBlueBinTraining 'Butler, Gerry','Yes','No','No','No','No','No','No','No','No','No','No','gbutler@bluebin.com'
+--exec sp_InsertBlueBinTraining 1,'Yes','No','No','No','No','No','No','No','No','No','No','gbutler@bluebin.com'
 
 
 CREATE PROCEDURE sp_InsertBlueBinTraining
@@ -24,8 +24,9 @@ CREATE PROCEDURE sp_InsertBlueBinTraining
 AS
 BEGIN
 SET NOCOUNT ON
+select * from bluebin.BlueBinResource
 
-if not exists (select * from bluebin.BlueBinTraining where BlueBinResourceID in (select BlueBinResourceID from bluebin.BlueBinResource where BlueBinResourceID  = @BlueBinResource))
+if not exists (select * from bluebin.BlueBinTraining where Active = 1 and BlueBinResourceID in (select BlueBinResourceID from bluebin.BlueBinResource where BlueBinResourceID  = @BlueBinResource))--
 	BEGIN
 	insert into [bluebin].[BlueBinTraining]
 	select 

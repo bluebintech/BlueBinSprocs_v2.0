@@ -45,7 +45,13 @@ VALUES
 ('PasswordExpires','90','DMS',1,getdate()),
 ('SiteAppURL','BlueBinOperations_Demo','DMS',1,getdate()),
 ('TableaURL','/bluebinanalytics/views/Demo/','Tableau',1,getdate()),
-('LOCATION','STORE','Tableau',1,getdate())
+('LOCATION','STORE','Tableau',1,getdate()),
+('MENU-Dashboard','1','DMS',1,getdate()),
+('MENU-QCN','1','DMS',1,getdate()),
+('MENU-Gemba','1','DMS',1,getdate()),
+('MENU-Hardware','1','DMS',1,getdate()),
+('MENU-Scanning','1','DMS',1,getdate()),
+('MENU-Other','1','DMS',1,getdate())
 
 END
 GO
@@ -101,8 +107,16 @@ if not exists (select * from sys.tables where name = 'BlueBinOperations')
 BEGIN
 CREATE TABLE [bluebin].[BlueBinOperations](
 	[OpID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
-	[OpName] varchar (50) NOT NULL
+	[OpName] varchar (50) NOT NULL,
+	[Description] varchar (255) NULL
 )
+
+Insert into bluebin.BlueBinOperations (OpName) VALUES
+('ADMIN-MENU'),
+('ADMIN-CONFIG'),
+('ADMIN-USERS'),
+('ADMIN-RESOURCES'),
+('ADMIN-TRAINING')
 END
 GO
 
@@ -138,6 +152,29 @@ CREATE TABLE [bluebin].[BlueBinUserOperations](
 
 ALTER TABLE [bluebin].[BlueBinUserOperations] WITH CHECK ADD FOREIGN KEY([BlueBinUserID])
 REFERENCES [bluebin].[BlueBinUser] ([BlueBinUserID])
+
+END
+GO
+
+if not exists (select * from sys.tables where name = 'BlueBinRoleOperations')
+BEGIN
+CREATE TABLE [bluebin].[BlueBinRoleOperations](
+	[RoleID] INT NOT NULL,
+	[OpID] INT NOT NULL
+)
+
+ALTER TABLE [bluebin].[BlueBinRoleOperations] WITH CHECK ADD FOREIGN KEY([RoleID])
+REFERENCES [bluebin].[BlueBinRoles] ([RoleID])
+
+ALTER TABLE [bluebin].[BlueBinRoleOperations] WITH CHECK ADD FOREIGN KEY([OpID])
+REFERENCES [bluebin].[BlueBinOperations] ([OpID])
+
+insert into [bluebin].[BlueBinRoleOperations]
+select 
+RoleID,--(select RoleID from bluebin.BlueBinRoles where RoleName = 'Manager'),
+OpID
+from  [bluebin].[BlueBinOperations],bluebin.BlueBinRoles 
+WHERE OpName like 'ADMIN%' and RoleName in ('Manager','Supervisor','BlueBinPersonnel','BlueBelt')
 
 END
 GO

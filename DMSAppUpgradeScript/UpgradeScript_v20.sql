@@ -73,6 +73,12 @@ END
 ALTER TABLE bluebin.Config ALTER COLUMN ConfigValue varchar(100)
 GO
 
+if not exists(select * from sys.columns where name = 'Description' and object_id = (select object_id from sys.tables where name = 'BlueBinOperations'))
+BEGIN
+ALTER TABLE bluebin.BlueBinOperations ADD [Description] varchar(255);
+END
+GO
+
 if not exists(select * from sys.columns where name = 'ConfigType' and object_id = (select object_id from sys.tables where name = 'Config'))
 BEGIN
 ALTER TABLE bluebin.Config ADD ConfigType varchar(50);
@@ -92,10 +98,60 @@ insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType
 select 'TrainingTitle','Tech',1,getdate(),'DMS'
 END
 GO
+
+if not exists(select * from bluebin.Config where ConfigName like 'MENU-%')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,ConfigType,Active,LastUpdated) VALUES
+('MENU-Dashboard','1','DMS',1,getdate()),
+('MENU-QCN','1','DMS',1,getdate()),
+('MENU-Gemba','1','DMS',1,getdate()),
+('MENU-Hardware','1','DMS',1,getdate()),
+('MENU-Scanning','1','DMS',1,getdate()),
+('MENU-Other','1','DMS',1,getdate())
+END
+GO
+
+if not exists(select * from bluebin.BlueBinOperations where OpName like 'ADMIN%')  
+BEGIN
+Insert into bluebin.BlueBinOperations (OpName,[Description]) VALUES
+('ADMIN-MENU','Give User ability to see the Main Admin Menu'),
+('ADMIN-CONFIG','Give User ability to see the Sub Admin Menu Config'),
+('ADMIN-USERS','Give User ability to see the Sub Admin Menu User Administration'),
+('ADMIN-RESOURCES','Give User ability to see the Sub Admin Menu Resources'),
+('ADMIN-TRAINING','Give User ability to see the Sub Admin Menu Training')
+END
+GO
+
 Print 'Table Updates Complete'
 --*************************************************************************************************************************************************
 --Table Adds
 --*************************************************************************************************************************************************
+
+--*****************************************************
+--**************************NEWTABLE**********************
+
+if not exists (select * from sys.tables where name = 'BlueBinRoleOperations')
+BEGIN
+CREATE TABLE [bluebin].[BlueBinRoleOperations](
+	[RoleID] INT NOT NULL,
+	[OpID] INT NOT NULL
+)
+
+ALTER TABLE [bluebin].[BlueBinRoleOperations] WITH CHECK ADD FOREIGN KEY([RoleID])
+REFERENCES [bluebin].[BlueBinRoles] ([RoleID])
+
+ALTER TABLE [bluebin].[BlueBinRoleOperations] WITH CHECK ADD FOREIGN KEY([OpID])
+REFERENCES [bluebin].[BlueBinOperations] ([OpID])
+
+insert into [bluebin].[BlueBinRoleOperations]
+select 
+RoleID,--(select RoleID from bluebin.BlueBinRoles where RoleName = 'Manager'),
+OpID
+from  [bluebin].[BlueBinOperations],bluebin.BlueBinRoles 
+WHERE OpName like 'ADMIN%' and RoleName in ('Manager','Supervisor','BlueBinPersonnel','BlueBelt')
+
+END
+GO
 
 --*****************************************************
 --**************************NEWTABLE**********************
@@ -220,7 +276,13 @@ VALUES
 ('PasswordExpires','90','DMS',1,getdate()),
 ('SiteAppURL','BlueBinOperations_Demo','DMS',1,getdate()),
 ('TableaURL','/bluebinanalytics/views/Demo/','Tableau',1,getdate()),
-('LOCATION','STORE','Tableau',1,getdate())
+('LOCATION','STORE','Tableau',1,getdate()),
+('MENU-Dashboard','1','DMS',1,getdate()),
+('MENU-QCN','1','DMS',1,getdate()),
+('MENU-Gemba','1','DMS',1,getdate()),
+('MENU-Hardware','1','DMS',1,getdate()),
+('MENU-Scanning','1','DMS',1,getdate()),
+('MENU-Other','1','DMS',1,getdate())
 ;
 END
 GO
@@ -299,7 +361,6 @@ insert into [bluebin].[BlueBinRoles] (RoleName) VALUES
 END
 GO
 
-
 --*****************************************************
 --**************************NEWTABLE**********************
 
@@ -307,8 +368,17 @@ if not exists (select * from sys.tables where name = 'BlueBinOperations')
 BEGIN
 CREATE TABLE [bluebin].[BlueBinOperations](
 	[OpID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
-	[OpName] varchar (50) NOT NULL
+	[OpName] varchar (50) NOT NULL,
+	[Description] varchar (255) NULL
 )
+
+Insert into bluebin.BlueBinOperations (OpName,[Description]) VALUES
+('ADMIN-MENU','Give User ability to see the Main Admin Menu'),
+('ADMIN-CONFIG','Give User ability to see the Sub Admin Menu Config'),
+('ADMIN-USERS','Give User ability to see the Sub Admin Menu User Administration'),
+('ADMIN-RESOURCES','Give User ability to see the Sub Admin Menu Resources'),
+('ADMIN-TRAINING','Give User ability to see the Sub Admin Menu Training')
+
 END
 GO
 
@@ -530,6 +600,279 @@ Print 'Table Adds Complete'
 --*************************************************************************************************************************************************
 --Sproc Updates
 --*************************************************************************************************************************************************
+
+--*****************************************************
+--**************************SPROC**********************
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertUserOperations') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_InsertUserOperations
+GO
+
+
+CREATE PROCEDURE sp_InsertUserOperations
+@BlueBinUserID int,
+@OpID int
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+insert into bluebin.BlueBinUserOperations select @BlueBinUserID,@OpID
+
+END
+GO
+grant exec on sp_InsertUserOperations to appusers
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertRoleOperations') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_InsertRoleOperations
+GO
+
+
+CREATE PROCEDURE sp_InsertRoleOperations
+@RoleID int,
+@OpID int
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+insert into bluebin.BlueBinRoleOperations select @RoleID,@OpID
+
+END
+GO
+grant exec on sp_InsertRoleOperations to appusers
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectUserOperations') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectUserOperations
+GO
+
+--exec sp_SelectUserOperations 'Butler'
+CREATE PROCEDURE sp_SelectUserOperations
+@Name varchar(50)
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+Select 
+bbuo.BlueBinUserID,
+bbuo.OpID,
+bbu.UserLogin,
+bbu.LastName + ', ' + FirstName as Name,
+bbr.RoleName as [CurrentRole],
+bbo.OpName 
+from bluebin.BlueBinUserOperations bbuo
+inner join bluebin.BlueBinUser bbu on bbuo.BlueBinUserID = bbu.BlueBinUserID
+inner join bluebin.BlueBinRoles bbr on bbu.RoleID = bbr.RoleID
+inner join bluebin.BlueBinOperations bbo on bbuo.OpID = bbo.OpID
+where bbu.Active = 1
+  and
+  ([LastName] like '%' + @Name + '%' 
+	OR [FirstName] like '%' + @Name + '%' )
+order by bbu.LastName + ', ' + FirstName,bbo.OpName
+
+END
+GO
+grant exec on sp_SelectUserOperations to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectRoleOperations') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectRoleOperations
+GO
+
+--exec sp_SelectRoleOperations
+CREATE PROCEDURE sp_SelectRoleOperations
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+Select 
+bbro.RoleID,
+bbro.OpID,
+bbr.RoleName,
+bbo.OpName 
+from bluebin.BlueBinRoleOperations bbro
+inner join bluebin.BlueBinRoles bbr on bbro.RoleID = bbr.RoleID
+inner join bluebin.BlueBinOperations bbo on bbro.OpID = bbo.OpID
+order by bbr.RoleName,bbo.OpName
+
+END
+GO
+grant exec on sp_SelectRoleOperations to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_EditOperations') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_EditOperations
+GO
+
+
+CREATE PROCEDURE sp_EditOperations
+@OpID int,
+@OpName varchar(50),
+@Description varchar(255)
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+update bluebin.BlueBinOperations set OpName = @OpName, [Description] = @Description where OpID = @OpID
+END
+GO
+grant exec on sp_EditOperations to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertOperations') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_InsertOperations
+GO
+
+
+CREATE PROCEDURE sp_InsertOperations
+@OpName varchar(50),
+@Description varchar(255)
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+if not exists(select * from bluebin.BlueBinOperations where OpName = @OpName)
+BEGIN
+insert into bluebin.BlueBinOperations select @OpName,@Description
+END
+
+END
+GO
+grant exec on sp_InsertOperations to appusers
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectOperations') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectOperations
+GO
+
+
+CREATE PROCEDURE sp_SelectOperations
+
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+Select OpID,OpName,
+isnull([Description],'') as [Description] from bluebin.BlueBinOperations
+order by OpName
+
+END
+GO
+grant exec on sp_SelectOperations to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_ValidateMenus') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_ValidateMenus
+GO
+
+--exec sp_ValidateMenus 'MENU-QCN'
+
+CREATE PROCEDURE [dbo].[sp_ValidateMenus]
+	@ConfigName NVARCHAR(50)
+AS
+BEGIN
+SET NOCOUNT ON;
+
+declare @Menu as Table (ConfigValue varchar(50))
+
+Select 
+Case	
+	When ConfigValue = 1 or ConfigValue = 'Yes' Then 'Yes'
+	Else 'No'
+	End as ConfigValue
+from bluebin.Config 
+where ConfigName = @ConfigName
+
+
+END
+GO
+grant exec on sp_ValidateMenus to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_ValidateBlueBinRole') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_ValidateBlueBinRole
+GO
+
+--exec sp_ValidateBlueBinRole 'dhagan@bluebin.com','ADMIN-CONFIG'
+
+CREATE PROCEDURE [dbo].[sp_ValidateBlueBinRole]
+      @UserLogin NVARCHAR(30),
+	  @OpName NVARCHAR(50)
+AS
+BEGIN
+SET NOCOUNT ON;
+--Select RoleName from bluebin.BlueBinRoles
+--where RoleID in (select RoleID from bluebin.BlueBinUser where UserLogin = @UserLogin)
+
+declare @UserOp as Table (OpName varchar(50))
+
+insert into @UserOp
+select 
+Distinct 
+OpName 
+from bluebin.BlueBinOperations
+where 
+OpID in (select OpID from bluebin.BlueBinUserOperations where BlueBinUserID = (select BlueBinUserID from bluebin.BlueBinUser where UserLogin = @UserLogin))
+or
+OpID in (select OpID from bluebin.BlueBinRoleOperations where RoleID in (select RoleID from bluebin.BlueBinUser where UserLogin = @UserLogin))
+
+
+if exists(select * from @UserOp where OpName = @OpName)
+BEGIN
+	Select 'Yes'
+END
+ELSE
+	Select 'No'
+
+
+END
+GO
+grant exec on sp_ValidateBlueBinRole to appusers
+GO
+
 
 --*****************************************************
 --**************************SPROC**********************
@@ -1422,11 +1765,11 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertBlueBinT
 drop procedure sp_InsertBlueBinTraining
 GO
 
---exec sp_InsertBlueBinTraining 'Butler, Gerry ()','Yes','No','No','No','No','No','No','No','No','No','No','gbutler@bluebin.com'
+--exec sp_InsertBlueBinTraining 1,'Yes','No','No','No','No','No','No','No','No','No','No','gbutler@bluebin.com'
 
 
 CREATE PROCEDURE sp_InsertBlueBinTraining
-@BlueBinResource varchar(255), 
+@BlueBinResource int,--varchar(255), 
 @Form3000 varchar(10),
 @Form3001 varchar(10),
 @Form3002 varchar(10),
@@ -1444,12 +1787,14 @@ CREATE PROCEDURE sp_InsertBlueBinTraining
 AS
 BEGIN
 SET NOCOUNT ON
+select * from bluebin.BlueBinResource
 
-if not exists (select * from bluebin.BlueBinTraining where BlueBinResourceID in (select BlueBinResourceID from bluebin.BlueBinResource where LastName + ', ' + FirstName  = @BlueBinResource))
+if not exists (select * from bluebin.BlueBinTraining where Active = 1 and BlueBinResourceID in (select BlueBinResourceID from bluebin.BlueBinResource where BlueBinResourceID  = @BlueBinResource))--
 	BEGIN
 	insert into [bluebin].[BlueBinTraining]
 	select 
-	(select BlueBinResourceID from bluebin.BlueBinResource where LastName + ', ' + FirstName  = @BlueBinResource),
+	@BlueBinResource,
+	--(select BlueBinResourceID from bluebin.BlueBinResource where LastName + ', ' + FirstName = @BlueBinResource),
 	@Form3000,
 	@Form3001,
 	@Form3002,
@@ -3511,7 +3856,7 @@ Print 'Job Updates Complete'
 --Version Update
 --*************************************************************************************************************************************************
 
-declare @version varchar(50) = '2.0.20151218' --Update Version Number here
+declare @version varchar(50) = '2.0.20160101' --Update Version Number here
 
 
 if not exists (select * from bluebin.Config where ConfigName = 'Version')
