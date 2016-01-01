@@ -30,7 +30,7 @@ inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID
 inner join bluebin.DimBin db on sb.LocationID = db.LocationID and sl.ItemID = db.ItemID
 inner join bluebin.DimItem di on sl.ItemID = di.ItemID
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
-where sl.ScanBatchID = @ScanBatchID
+where sl.ScanBatchID = @ScanBatchID and sl.Active = 1
 order by sl.Line
 
 

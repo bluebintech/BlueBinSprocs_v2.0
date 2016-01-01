@@ -129,6 +129,22 @@ Print 'Table Updates Complete'
 
 --*****************************************************
 --**************************NEWTABLE**********************
+if not exists (select * from sys.tables where name = 'BlueBinUserOperations')
+BEGIN
+CREATE TABLE [bluebin].[BlueBinUserOperations](
+	[BlueBinUserID] INT NOT NULL,
+	[OpID] INT NOT NULL
+)
+
+ALTER TABLE [bluebin].[BlueBinUserOperations] WITH CHECK ADD FOREIGN KEY([BlueBinUserID])
+REFERENCES [bluebin].[BlueBinUser] ([BlueBinUserID])
+
+END
+GO
+
+
+--*****************************************************
+--**************************NEWTABLE**********************
 
 if not exists (select * from sys.tables where name = 'BlueBinRoleOperations')
 BEGIN
@@ -1097,17 +1113,21 @@ sb.LocationID,
 dl.LocationName as LocationName,
 max(sl.Line) as BinsScanned,
 sb.ScanDateTime as [DateScanned],
+bbu.LastName + ', ' + bbu.FirstName as ScannedBy,
 case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
 
 from scan.ScanBatch sb
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
 inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
+inner join bluebin.BlueBinUser bbu on sb.BlueBinUserID = bbu.BlueBinUserID
+where sb.Active = 1
 
 group by 
 sb.ScanBatchID,
 sb.LocationID,
 dl.LocationName,
 sb.ScanDateTime,
+bbu.LastName + ', ' + bbu.FirstName,
 sb.Extracted
 order by sb.ScanDateTime desc
 
@@ -1115,7 +1135,6 @@ END
 GO
 grant exec on sp_SelectScanBatch to public
 GO
-
 
 
 --*****************************************************
@@ -1153,7 +1172,7 @@ inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID
 inner join bluebin.DimBin db on sb.LocationID = db.LocationID and sl.ItemID = db.ItemID
 inner join bluebin.DimItem di on sl.ItemID = di.ItemID
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
-where sl.ScanBatchID = @ScanBatchID
+where sl.ScanBatchID = @ScanBatchID and sl.Active = 1
 order by sl.Line
 
 

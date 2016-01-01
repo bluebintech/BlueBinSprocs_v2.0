@@ -2575,8 +2575,186 @@ GO
 --*********************************************************************************************
 --Tableau Sproc  These load data into the datasources for Tableau
 --*********************************************************************************************
+IF EXISTS ( SELECT  *
+            FROM    sys.objects
+            WHERE   object_id = OBJECT_ID(N'tb_Training')
+                    AND type IN ( N'P', N'PC' ) ) 
+
+DROP PROCEDURE  tb_Training
+GO
+
+CREATE PROCEDURE tb_Training
+
+AS
+
+SELECT 
+bbr.LastName + ', ' + bbr.FirstName as Name
+	  ,bbt.[Form3000] as [3000]
+      ,bbt.[Form3001] as [3001]
+      ,bbt.[Form3002] as [3002]
+      ,bbt.[Form3003] as [3003]
+      ,bbt.[Form3004] as [3004]
+      ,bbt.[Form3005] as [3005]
+      ,bbt.[Form3006] as [3006]
+      ,bbt.[Form3007] as [3007]
+      ,bbt.[Form3008] as [3008]
+      ,bbt.[Form3009] as [3009]
+      ,bbt.[Form3010] as [3010]
+      ,left(bbt.[LastUpdated],11) as LastUpdated
+FROM   bluebin.BlueBinTraining bbt
+inner join bluebin.BlueBinResource bbr on bbt.BlueBinResourceID = bbr.BlueBinResourceID
+
+ORDER BY 
+bbr.LastName + ', ' + bbr.FirstName
+
+GO
+
+grant exec on tb_Training to public
+GO
+
+--*********************************************************************************************
+--Tableau Sproc  These load data into the datasources for Tableau
+--*********************************************************************************************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'tb_GembaDashboard') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure tb_GembaDashboard
+GO
+
+--exec tb_GembaDashboard 
+CREATE PROCEDURE tb_GembaDashboard
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+select 
+	g.[GembaAuditNodeID],
+	dl.[LocationID],
+	g.LocationID as AuditLocationID,
+        dl.[LocationName],
+			dl.BlueBinFlag,
+	u.LastName + ', ' + u.FirstName  as Auditer,
+    u.[UserLogin] as Login,
+	bbr.RoleName,
+	g.PS_TotalScore,
+	g.RS_TotalScore,
+	g.SS_TotalScore,
+	g.NIS_TotalScore,
+	g.TotalScore,
+	case when TotalScore < 90 then 1 else 0 end as ScoreUnder,
+	(select count(*) from bluebin.DimLocation where BlueBinFlag = 1) as LocationCount,
+    g.[Date],
+	g2.[MaxDate] as LastAuditDate,
+	case 
+		when g.[Date] is null then 365
+		else convert(int,(getdate() - g2.[MaxDate])) end as LastAudit,
+    g.[LastUpdated]
+from  [bluebin].[DimLocation] dl
+		left join [gemba].[GembaAuditNode] g on dl.LocationID = g.LocationID
+		left join (select Max([Date]) as MaxDate,LocationID from [gemba].[GembaAuditNode] group by LocationID) g2 on dl.LocationID = g2.LocationID and g.[Date] = g2.MaxDate
+        --left join [bluebin].[DimLocation] dl on g.LocationID = dl.LocationID and dl.BlueBinFlag = 1
+		left join [bluebin].[BlueBinUser] u on g.AuditerUserID = u.BlueBinUserID
+		left join bluebin.BlueBinRoles bbr on u.RoleID = bbr.RoleID
+
+WHERE dl.BlueBinFlag = 1 
+            order by dl.LocationID,[Date] asc
+
+END
+GO
+grant exec on tb_GembaDashboard to public
+GO
 
 
+
+
+--*********************************************************************************************
+--Tableau Sproc  These load data into the datasources for Tableau
+--*********************************************************************************************
+if exists (select * from dbo.sysobjects where id = object_id(N'tb_KanbansAdjusted') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure tb_KanbansAdjusted
+GO
+
+--exec tb_KanbansAdjusted
+
+CREATE PROCEDURE [dbo].[tb_KanbansAdjusted] 
+	
+AS
+
+BEGIN
+
+with C as
+(select 
+[Date] 
+,BinKey
+,LocationID
+,ItemID
+,BinQty as YestBinQty
+,BinUOM as YesBinUOM
+--,OrderQty as YestOrderQty
+--,OrderUOM as YestOrderUOM
+from tableau.Kanban 
+where [Date] >= getdate() -8 )
+,
+D as
+(
+select 
+DATEPART(WEEK,a.[Date]) as [Week]
+,a.[Date]
+,C.[Date] as Yesterday
+,a.BinKey
+,a.LocationID
+,dl.LocationName
+,a.ItemID
+,di.ItemDescription
+,convert(int,a.BinQty) as BinQty
+,a.BinUOM
+,convert(int,C.YestBinQty) as YestBinQty
+--,C.YesBinUOM
+,a.OrderQty
+,a.OrderUOM
+--,C.YestOrderQty
+--,C.YestOrderUOM
+,convert(int,a.BinQty) - convert(int,C.YestBinQty) as BinChange
+,a.OrderQty - convert(int,C.YestBinQty) as BinOrderChange
+,a.BinCurrentStatus
+
+from tableau.Kanban a
+left join C on a.BinKey = C.BinKey and a.[Date]-1 = C.[Date]
+left join bluebin.DimItem di on a.ItemID = di.ItemID
+left join bluebin.DimLocation dl on a.LocationID = dl.LocationID
+where a.[Date] >= getdate() -7
+)
+select 
+[Week]
+,[Date],Yesterday
+,BinKey
+,LocationID
+,LocationName
+,ItemID
+,ItemDescription
+,BinQty
+,YestBinQty
+,BinUOM
+,OrderQty
+,OrderUOM
+, case when BinChange != 0 then 1 else BinChange end as BinChange
+, case when BinOrderChange != 0 then 1 else BinOrderChange end as BinOrderChange
+,BinCurrentStatus 
+from D 
+where 
+(BinOrderChange != 0 or BinChange != 0)
+	and BinUOM = OrderUOM 
+		and OrderQty is not null
+			and [Week] = datepart(WEEK,getdate())
+order by LocationName,ItemDescription,[Date]
+END
+GO
+grant exec on tb_KanbansAdjusted to public
+GO
+--*********************************************************************************************
+--Tableau Sproc  These load data into the datasources for Tableau
+--*********************************************************************************************
 
 if exists (select * from dbo.sysobjects where id = object_id(N'tb_JobStatus') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure tb_JobStatus
