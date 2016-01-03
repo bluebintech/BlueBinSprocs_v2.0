@@ -111,6 +111,16 @@ insert into bluebin.Config (ConfigName,ConfigValue,ConfigType,Active,LastUpdated
 END
 GO
 
+if not exists(select * from bluebin.Config where ConfigName like 'MENU-Dashboard-%')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,ConfigType,Active,LastUpdated) VALUES
+('MENU-Dashboard-SupplyChain','1','DMS',1,getdate()),
+('MENU-Dashboard-Sourcing','1','DMS',1,getdate()),
+('MENU-Dashboard-Ops','1','DMS',1,getdate())
+END
+GO
+
+
 if not exists(select * from bluebin.BlueBinOperations where OpName like 'ADMIN%')  
 BEGIN
 Insert into bluebin.BlueBinOperations (OpName,[Description]) VALUES
