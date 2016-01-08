@@ -7,7 +7,7 @@ DROP PROCEDURE  tb_Sourcing
 GO
 
 CREATE PROCEDURE	tb_Sourcing
-
+--exec tb_Sourcing  select * from tableau.Sourcing
 AS
 
 /********************************		DROP Sourcing		**********************************/
@@ -98,7 +98,7 @@ SELECT Row_number()
        PO_RELEASE                        AS PORelease,
        PO_CODE                           AS POCode,
        ITEM                              AS ItemNumber,
-       a.VENDOR                            AS VendorCode,
+	   a.VENDOR                            AS VendorCode,
 	   d.VENDOR_VNAME					AS VendorName,
        a.BUYER_CODE                        AS Buyer,
 	   c.NAME							AS BuyerName,
@@ -112,6 +112,7 @@ SELECT Row_number()
        ENT_UNIT_CST                      AS UnitCost,
        ENT_BUY_UOM                       AS BuyUOM,
        EBUY_UOM_MULT                     AS BuyUOMMult,
+	   ENT_UNIT_CST/EBUY_UOM_MULT		 AS IndividualCost,
        PO_DATE                           AS PODate,
        EARLY_DL_DATE                     AS ExpectedDeliveryDate,
        LATE_DL_DATE                      AS LateDeliveryDate,
@@ -141,6 +142,7 @@ FROM   #tmpPOLines a
 		LEFT JOIN BUYER c
 		ON a.BUYER_CODE = c.BUYER_CODE
 		LEFT JOIN APVENMAST d ON a.VENDOR = d.VENDOR
+
 
 --#tmpPOs
 
@@ -176,8 +178,10 @@ SELECT *,
          WHEN PODeliveryStatus = 'Late' THEN 1
          ELSE 0
        END AS Late
-INTO   tableau.Sourcing
+INTO   tableau.Sourcing 
+		
 FROM   #tmpPOs
+LEFT JOIN bluebin.DimLocation dl on PurchaseLocation = dl.LocationID
 
 /***********************		DROP Temp Tables	**************************/
 

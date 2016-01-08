@@ -12,10 +12,11 @@ AS
 BEGIN
 SET NOCOUNT ON
 declare @QCNStatus int = 0
-
+declare @QCNStatus2 int = 0
 if @Completed = 0
 begin
 select @QCNStatus = QCNStatusID from qcn.QCNStatus where Status = 'Completed'
+select @QCNStatus2 = QCNStatusID from qcn.QCNStatus where Status = 'Rejected'
 end
 
 select 
@@ -39,7 +40,7 @@ di.[ItemManufacturerNumber],
             case when q.[Details] ='' then 'No' else 'Yes' end Details,
 	q.[Updates] as [UpdatesText],
             case when q.[Updates] ='' then 'No' else 'Yes' end Updates,
-	case when qs.Status = 'Completed' then convert(int,(q.[DateCompleted] - q.[DateEntered]))
+	case when qs.Status in ('Rejected','Completed') then convert(int,(q.[DateCompleted] - q.[DateEntered]))
 		else convert(int,(getdate() - q.[DateEntered])) end as DaysOpen,
             q.[DateEntered],
 	q.[DateCompleted],
@@ -56,7 +57,7 @@ inner join [qcn].[QCNType] qt on q.QCNTypeID = qt.QCNTypeID
 inner join [qcn].[QCNStatus] qs on q.QCNStatusID = qs.QCNStatusID
 
 WHERE q.Active = 1 and dl.LocationName LIKE '%' + @LocationName + '%' 
-and q.QCNStatusID <> @QCNStatus
+and q.QCNStatusID not in (@QCNStatus,@QCNStatus2)
             order by q.[DateEntered] asc--,convert(int,(getdate() - q.[DateEntered])) desc
 
 END

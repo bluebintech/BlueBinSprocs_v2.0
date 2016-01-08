@@ -12,6 +12,11 @@ AS
 
 SELECT 
 bbr.LastName + ', ' + bbr.FirstName as Name
+,case when 
+		bbt.[Form3000]='Trained' and bbt.[Form3001]='Trained' and bbt.[Form3002]='Trained' and 
+		bbt.[Form3003]='Trained' and bbt.[Form3004]='Trained' and bbt.[Form3005]='Trained' and 
+		bbt.[Form3006]='Trained' and bbt.[Form3007]='Trained' and bbt.[Form3008]='Trained' and 
+		bbt.[Form3009]='Trained' and bbt.[Form3010] ='Trained' then 'Yes' Else 'No' end as FullyTrained
 	  ,bbt.[Form3000] as [3000]
       ,bbt.[Form3001] as [3001]
       ,bbt.[Form3002] as [3002]

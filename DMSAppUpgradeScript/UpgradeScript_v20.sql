@@ -114,6 +114,7 @@ GO
 if not exists(select * from bluebin.Config where ConfigName like 'MENU-Dashboard-%')  
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,ConfigType,Active,LastUpdated) VALUES
+('MENU-Dashboard-HuddleBoard','1','DMS',1,getdate()),
 ('MENU-Dashboard-SupplyChain','1','DMS',1,getdate()),
 ('MENU-Dashboard-Sourcing','1','DMS',1,getdate()),
 ('MENU-Dashboard-Ops','1','DMS',1,getdate())
@@ -907,8 +908,8 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectBlueBinT
 drop procedure sp_SelectBlueBinTraining
 GO
 
-
-CREATE PROCEDURE sp_SelectBlueBinTraining 
+--exec sp_SelectBlueBinTraining 'Butler'
+CREATE PROCEDURE sp_SelectBlueBinTraining
 @Name varchar (30)
 
 --WITH ENCRYPTION
@@ -920,7 +921,12 @@ bbt.[BlueBinTrainingID],
 bbt.[BlueBinResourceID], 
 bbr.[LastName] + ', ' +bbr.[FirstName] as ResourceName, 
 bbr.Title,
-bbt.[Form3000],
+case when 
+		bbt.[Form3000]='Trained' and bbt.[Form3001]='Trained' and bbt.[Form3002]='Trained' and 
+		bbt.[Form3003]='Trained' and bbt.[Form3004]='Trained' and bbt.[Form3005]='Trained' and 
+		bbt.[Form3006]='Trained' and bbt.[Form3007]='Trained' and bbt.[Form3008]='Trained' and 
+		bbt.[Form3009]='Trained' and bbt.[Form3010] ='Trained' then 'Yes' Else 'No' end as FullyTrained,
+	bbt.[Form3000],
 		bbt.[Form3001],
 			bbt.[Form3002],
 				bbt.[Form3003],
@@ -931,6 +937,7 @@ bbt.[Form3000],
 									bbt.[Form3008],
 										bbt.[Form3009],
 											bbt.[Form3010],
+
 ISNULL((bbu.[LastName] + ', ' +bbu.[FirstName]),'N/A') as Updater,
 bbt.LastUpdated
 
@@ -938,10 +945,10 @@ FROM [bluebin].[BlueBinTraining] bbt
 inner join [bluebin].[BlueBinResource] bbr on bbt.[BlueBinResourceID] = bbr.[BlueBinResourceID]
 left join [bluebin].[BlueBinUser] bbu on bbt.[BlueBinUserID] = bbu.[BlueBinUserID]
 
-Where 
+WHERE 
 bbt.Active = 1 and 
 (bbr.[LastName] like '%' + @Name + '%' 
-	OR bbr.[FirstName] like '%' + @Name + '%')  
+	OR bbr.[FirstName] like '%' + @Name + '%') 
 	
 ORDER BY bbr.[LastName]
 END
@@ -949,6 +956,7 @@ END
 GO
 grant exec on sp_SelectBlueBinTraining to appusers
 GO
+
 
 --*****************************************************
 --**************************SPROC**********************
@@ -1345,10 +1353,11 @@ AS
 BEGIN
 SET NOCOUNT ON
 declare @QCNStatus int = 0
-
+declare @QCNStatus2 int = 0
 if @Completed = 0
 begin
 select @QCNStatus = QCNStatusID from qcn.QCNStatus where Status = 'Completed'
+select @QCNStatus2 = QCNStatusID from qcn.QCNStatus where Status = 'Rejected'
 end
 
 select 
@@ -1372,7 +1381,7 @@ di.[ItemManufacturerNumber],
             case when q.[Details] ='' then 'No' else 'Yes' end Details,
 	q.[Updates] as [UpdatesText],
             case when q.[Updates] ='' then 'No' else 'Yes' end Updates,
-	case when qs.Status = 'Completed' then convert(int,(q.[DateCompleted] - q.[DateEntered]))
+	case when qs.Status in ('Rejected','Completed') then convert(int,(q.[DateCompleted] - q.[DateEntered]))
 		else convert(int,(getdate() - q.[DateEntered])) end as DaysOpen,
             q.[DateEntered],
 	q.[DateCompleted],
@@ -1389,7 +1398,7 @@ inner join [qcn].[QCNType] qt on q.QCNTypeID = qt.QCNTypeID
 inner join [qcn].[QCNStatus] qs on q.QCNStatusID = qs.QCNStatusID
 
 WHERE q.Active = 1 and dl.LocationName LIKE '%' + @LocationName + '%' 
-and q.QCNStatusID <> @QCNStatus
+and q.QCNStatusID not in (@QCNStatus,@QCNStatus2)
             order by q.[DateEntered] asc--,convert(int,(getdate() - q.[DateEntered])) desc
 
 END

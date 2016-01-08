@@ -47,6 +47,7 @@ VALUES
 ('TableaURL','/bluebinanalytics/views/Demo/','Tableau',1,getdate()),
 ('LOCATION','STORE','Tableau',1,getdate()),
 ('MENU-Dashboard','1','DMS',1,getdate()),
+('MENU-Dashboard-HuddleBoard','1','DMS',1,getdate()),
 ('MENU-Dashboard-Sourcing','1','DMS',1,getdate()),
 ('MENU-Dashboard-SupplyChain','1','DMS',1,getdate()),
 ('MENU-Dashboard-Ops','1','DMS',1,getdate()),
