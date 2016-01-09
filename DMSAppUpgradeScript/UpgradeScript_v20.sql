@@ -1950,8 +1950,8 @@ GO
 --exec sp_InsertBlueBinResource 'TEST'
 
 CREATE PROCEDURE sp_InsertBlueBinResource
-@FirstName varchar (30)
-,@LastName varchar (30)
+@LastName varchar (30)
+,@FirstName varchar (30)
 ,@MiddleName varchar (30)
 ,@Login varchar (30)
 ,@Email varchar (50)
@@ -3894,7 +3894,7 @@ Print 'Job Updates Complete'
 --Version Update
 --*************************************************************************************************************************************************
 
-declare @version varchar(50) = '2.0.20160101' --Update Version Number here
+declare @version varchar(50) = '2.0.20160115' --Update Version Number here
 
 
 if not exists (select * from bluebin.Config where ConfigName = 'Version')

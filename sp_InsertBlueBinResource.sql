@@ -5,8 +5,8 @@ GO
 --exec sp_InsertBlueBinResource 'TEST'
 
 CREATE PROCEDURE sp_InsertBlueBinResource
-@FirstName varchar (30)
-,@LastName varchar (30)
+@LastName varchar (30)
+,@FirstName varchar (30)
 ,@MiddleName varchar (30)
 ,@Login varchar (30)
 ,@Email varchar (50)
