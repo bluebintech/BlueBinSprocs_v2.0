@@ -5,7 +5,7 @@ GO
 --exec sp_ValidateBlueBinRole 'gbutler@bluebin.com','ADMIN-CONFIG'
 
 CREATE PROCEDURE [dbo].[sp_ValidateBlueBinRole]
-      @UserLogin NVARCHAR(30),
+      @UserLogin NVARCHAR(60),
 	  @OpName NVARCHAR(50)
 AS
 BEGIN

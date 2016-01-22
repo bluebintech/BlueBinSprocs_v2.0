@@ -6,7 +6,7 @@ GO
 --grant exec on sp_ValidateBlueBinUser to appusers
 
 CREATE PROCEDURE [dbo].[sp_ValidateBlueBinUser]
-      @UserLogin NVARCHAR(30),
+      @UserLogin NVARCHAR(60),
       @Password varchar(max)
 AS
 BEGIN

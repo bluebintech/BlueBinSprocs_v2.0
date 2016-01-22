@@ -37,8 +37,8 @@ SELECT COMPANY,
 INTO #ICTRANS
 FROM   ICTRANS a
        INNER JOIN bluebin.DimLocation b
-               ON a.FROM_TO_LOC = b.LocationID
-WHERE b.BlueBinFlag = 1
+               ON a.FROM_TO_LOC = b.LocationID 
+WHERE b.BlueBinFlag = 1 --and DOCUMENT in (select SOURCE_DOC_N from POLINESRC where PO_NUMBER like '%426282%')
 
 SELECT COMPANY,
 	   CASE 
@@ -64,7 +64,7 @@ SELECT COMPANY,
 INTO #REQLINE
 FROM   REQLINE
 WHERE  STATUS = 9
-       AND KILL_QUANTITY = 0
+       AND KILL_QUANTITY = 0 --and REQ_NUMBER in (select SOURCE_DOC_N from POLINESRC where PO_NUMBER like '%426282%')
 
 SELECT 
 		CASE
@@ -74,21 +74,29 @@ SELECT
 			WHEN LEN(a.SOURCE_DOC_N) = 10 and LEFT(a.SOURCE_DOC_N,3) = '000' THEN RIGHT(a.SOURCE_DOC_N,7)	
 		ELSE a.SOURCE_DOC_N 
 		END AS REQ_NUMBER,
-       a.SRC_LINE_NBR                                                                         AS LINE_NBR,
-       MIN(Cast(CONVERT(VARCHAR, b.REC_DATE, 101) + ' '
-			+ LEFT(RIGHT('00000' + CONVERT(VARCHAR, case when b.UPDATE_TIME is null then '00000000' else b.UPDATE_TIME end), 8), 2)
+       po.LINE_NBR   AS LINE_NBR
+       ,MIN(Cast(CONVERT(VARCHAR, COALESCE(b.REC_DATE,po.REC_ACT_DATE), 101) 
+			+ ' '
+            + LEFT(RIGHT('00000' + CONVERT(VARCHAR, case when b.UPDATE_TIME is null then '00000000' else b.UPDATE_TIME end), 8), 2)
             + ':'
             + Substring(RIGHT('00000' + CONVERT(VARCHAR, case when b.UPDATE_TIME is null then '00000000' else b.UPDATE_TIME end), 8), 3, 2)
             + ':'
-            + Substring(RIGHT('00000' + CONVERT(VARCHAR, case when b.UPDATE_TIME is null then '00000000' else b.UPDATE_TIME end), 8), 5, 2) AS DATETIME)) AS REC_DATE
+            + Substring(RIGHT('00000' + CONVERT(VARCHAR, case when b.UPDATE_TIME is null then '00000000' else b.UPDATE_TIME end), 8), 5, 2) 
+			
+			AS DATETIME)) AS REC_DATE
 INTO #POLINE
-FROM   POLINESRC a
-       INNER JOIN PORECLINE b
-               ON a.PO_NUMBER = b.PO_NUMBER
-                  AND a.LINE_NBR = b.PO_LINE_NBR 
+FROM   POLINE po
+       INNER JOIN POLINESRC a on ltrim(rtrim(po.PO_NUMBER)) = ltrim(rtrim(a.PO_NUMBER))
+	   LEFT OUTER JOIN PORECLINE b
+               ON ltrim(rtrim(a.PO_NUMBER)) = ltrim(rtrim(b.PO_NUMBER))
+                  AND po.LINE_NBR = b.PO_LINE_NBR 
+where po.REC_ACT_DATE > getdate()-5000  and REC_QTY >0 --and po.PO_NUMBER like '%426282%'
+
 GROUP BY
 	a.SOURCE_DOC_N,
-	a.SRC_LINE_NBR
+	po.LINE_NBR
+
+
 
 SELECT Row_number()
          OVER(
@@ -127,7 +135,7 @@ FROM   #REQLINE a
               ON a.COMPANY = e.COMPANY
                  AND a.REQ_NUMBER = e.DOCUMENT
                  AND a.LINE_NBR = e.LINE_NBR 
-
+--WHERE a.REQ_NUMBER in (select SOURCE_DOC_N from POLINESRC where PO_NUMBER like '%426282%')
 
 /***********************************		CREATE FactScan		****************************************/
 
@@ -167,7 +175,7 @@ FROM   #tmpScan a
 			  AND a.OrderFacility = c.LocationFacility		
        LEFT JOIN bluebin.DimItem d
               ON a.ItemID = d.ItemID 
-
+order by 8
 
 /*****************************************		DROP Temp Tables		*******************************/
 
@@ -181,3 +189,4 @@ GO
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'FactScan'
+

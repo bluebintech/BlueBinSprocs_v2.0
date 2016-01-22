@@ -3,7 +3,7 @@ drop procedure sp_ChangePasswordBlueBinUser
 GO
 
 CREATE PROCEDURE [dbo].[sp_ChangePasswordBlueBinUser]
-      @UserLogin NVARCHAR(30),
+      @UserLogin NVARCHAR(60),
       @OldPassword varchar(max),
 	  @NewPassword varchar(max),
 	  @ConfirmNewPassword varchar(max)

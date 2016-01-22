@@ -4,7 +4,7 @@ GO
 
 --exec sp_DeleteImages 'gbutler@bluebin.com','151116'
 CREATE PROCEDURE sp_DeleteImages
-@UserLogin varchar(100),
+@UserLogin varchar(60),
 @ImageSourceIDPH int 
 
 

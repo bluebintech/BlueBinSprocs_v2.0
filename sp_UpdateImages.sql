@@ -5,7 +5,7 @@ GO
 --exec sp_UpdateImages 'gbutler@bluebin.com','151116'
 CREATE PROCEDURE sp_UpdateImages
 @GembaAuditNodeID int,
-@UserLogin varchar(100),
+@UserLogin varchar(60),
 @ImageSourceIDPH int 
 
 

@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_ForgotPassword
 drop procedure sp_ForgotPasswordBlueBinUser
 GO
 CREATE PROCEDURE sp_ForgotPasswordBlueBinUser
-      @UserLogin NVARCHAR(30)
+      @UserLogin NVARCHAR(60)
 AS
 BEGIN
       SET NOCOUNT ON;
@@ -14,7 +14,7 @@ BEGIN
      
       IF @BlueBinUserID IS NOT NULL  
       BEGIN
-            DECLARE @UserTable TABLE (BlueBinUserID int, UserLogin varchar(50), pwd varchar(10),created datetime)
+            DECLARE @UserTable TABLE (BlueBinUserID int, UserLogin varchar(60), pwd varchar(10),created datetime)
 			declare @table table (p varchar(50))
 
 			insert @table exec sp_GeneratePassword 8 

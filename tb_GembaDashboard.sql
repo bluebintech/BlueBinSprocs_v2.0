@@ -18,7 +18,7 @@ select
 			dl.BlueBinFlag,
 	u.LastName + ', ' + u.FirstName  as Auditer,
     u.[UserLogin] as Login,
-	bbr.RoleName,
+	u.Title as RoleName,
 	g.PS_TotalScore,
 	g.RS_TotalScore,
 	g.SS_TotalScore,

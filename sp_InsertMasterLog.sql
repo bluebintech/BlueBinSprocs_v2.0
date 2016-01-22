@@ -3,7 +3,7 @@ drop procedure sp_InsertMasterLog
 GO
 
 CREATE PROCEDURE sp_InsertMasterLog
-@UserLogin varchar (30)
+@UserLogin varchar (60)
 ,@ActionType varchar (30)
 ,@ActionName varchar (50)
 ,@ActionID int

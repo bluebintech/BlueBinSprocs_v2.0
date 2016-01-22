@@ -1,3 +1,9 @@
+/******************************************
+
+			DimItem
+
+******************************************/
+
 IF EXISTS ( SELECT  *
             FROM    sys.objects
             WHERE   object_id = OBJECT_ID(N'etl_DimItem')
@@ -12,8 +18,8 @@ CREATE PROCEDURE etl_DimItem
 AS
 
 /**************		SET BUSINESS RULES		***************/
-DECLARE @PrimaryLocation varchar(50) 
-select @PrimaryLocation = ConfigValue from bluebin.Config where ConfigName = 'LOCATION'
+
+
 
 
 /**************		DROP DimItem			***************/
@@ -33,7 +39,7 @@ SELECT ITEM,
        USER_FIELD3 AS ClinicalDescription
 INTO   #ClinicalDescriptions
 FROM   ITEMLOC
-WHERE  LOCATION = @PrimaryLocation
+WHERE  LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
        AND Len(Ltrim(USER_FIELD3)) > 0
 
 SELECT ITEM,
@@ -50,7 +56,7 @@ SELECT ITEM,
        PREFER_BIN
 INTO   #StockLocations
 FROM   ITEMLOC
-WHERE  LOCATION = @PrimaryLocation
+WHERE  LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
 
 SELECT a.ITEM,
        a.VENDOR,
@@ -86,7 +92,7 @@ SELECT Row_number()
 	   a.DESCRIPTION2					AS ItemDescription2,
        e.ClinicalDescription               AS ItemClinicalDescription,
        a.ACTIVE_STATUS                     AS ActiveStatus,
-       b.DESCRIPTION                        AS ItemManufacturer,
+       a.MANUF_NBR                         AS ItemManufacturer, --b.DESCRIPTION
        a.MANUF_NBR                         AS ItemManufacturerNumber,
        d.VENDOR_VNAME                      AS ItemVendor,
        c.VENDOR                            AS ItemVendorNumber,
@@ -99,12 +105,12 @@ SELECT Row_number()
        + ' EA' + '/'+Ltrim(Rtrim(h.UOM)) AS PackageString
 INTO   bluebin.DimItem
 FROM   ITEMMAST a
-       LEFT JOIN ICMANFCODE b
-              ON a.MANUF_CODE = b.MANUF_CODE
+       --LEFT JOIN ICMANFCODE b
+       --       ON a.MANUF_CODE = b.MANUF_CODE
        LEFT JOIN ITEMSRC c
               ON a.ITEM = c.ITEM
                  AND c.REPLENISH_PRI = 1
-                 AND c.LOCATION = @PrimaryLocation
+                 AND c.LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
        LEFT JOIN APVENMAST d
               ON c.VENDOR = d.VENDOR
        LEFT JOIN #ClinicalDescriptions e
@@ -135,3 +141,4 @@ GO
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'DimItem'
+GO

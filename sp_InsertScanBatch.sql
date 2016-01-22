@@ -10,7 +10,7 @@ exec sp_InsertScanBatch @Location,@Scanner
 */
 
 CREATE PROCEDURE sp_InsertScanBatch
-@Location char(5),
+@Location char(7),
 @Scanner varchar(255)
 
 

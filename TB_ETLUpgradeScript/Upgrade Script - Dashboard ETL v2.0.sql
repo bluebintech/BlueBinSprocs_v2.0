@@ -135,6 +135,39 @@ insert into etl.JobSteps (StepNumber,StepName,StepProcedure,StepTable,ActiveFlag
 END
 GO
 
+
+if not exists (select * from sys.tables where name = 'JobHeader')
+BEGIN
+
+CREATE TABLE [etl].[JobHeader](
+	[ProcessID] [int] NULL,
+	[StartTime] [datetime] NULL,
+	[EndTime] [datetime] NULL,
+	[Duration]  AS ((((right('0'+CONVERT([varchar],datediff(hour,[StartTime],[EndTime]),(0)),(2))+':')+right('0'+CONVERT([varchar],datediff(minute,[StartTime],[EndTime]),(0)),(2)))+':')+right('0'+CONVERT([varchar],datediff(second,[StartTime],[EndTime])%(60),(0)),(2))),
+	[Result] [varchar](50) NULL
+) ON [PRIMARY]
+
+END
+GO
+
+
+if not exists (select * from sys.tables where name = 'JobDetails')
+BEGIN
+
+CREATE TABLE [etl].[JobDetails](
+	[ProcessID] [int] NULL,
+	[StepName] [varchar](50) NULL,
+	[StartTime] [datetime] NULL,
+	[EndTime] [datetime] NULL,
+	[Duration]  AS ((((right('0'+CONVERT([varchar],datediff(hour,[StartTime],isnull([EndTime],getdate())),(0)),(2))+':')+right('0'+CONVERT([varchar],round(datediff(second,[StartTime],isnull([EndTime],getdate()))/(60),(0)),(0)),(2)))+':')+right('0'+CONVERT([varchar],datediff(second,[StartTime],isnull([EndTime],getdate()))%(60),(0)),(2))),
+	[RowCount] [int] NULL,
+	[Result] [varchar](50) NULL,
+	[Message] [varchar](max) NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+END
+GO
+
+
 /****** Object:  Table [bluebin].[DimWarehouseItem]    Script Date: 12/11/2015 2:43:36 PM ******/
 if not exists (select * from sys.tables where name = 'DimWarehouseItem')
 BEGIN
@@ -192,8 +225,7 @@ CREATE PROCEDURE etl_DimItem
 AS
 
 /**************		SET BUSINESS RULES		***************/
-DECLARE @PrimaryLocation varchar(50) 
-select @PrimaryLocation = ConfigValue from bluebin.Config where ConfigName = 'LOCATION'
+
 
 
 
@@ -214,7 +246,7 @@ SELECT ITEM,
        USER_FIELD3 AS ClinicalDescription
 INTO   #ClinicalDescriptions
 FROM   ITEMLOC
-WHERE  LOCATION = @PrimaryLocation
+WHERE  LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
        AND Len(Ltrim(USER_FIELD3)) > 0
 
 SELECT ITEM,
@@ -231,7 +263,7 @@ SELECT ITEM,
        PREFER_BIN
 INTO   #StockLocations
 FROM   ITEMLOC
-WHERE  LOCATION = @PrimaryLocation
+WHERE  LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
 
 SELECT a.ITEM,
        a.VENDOR,
@@ -267,7 +299,7 @@ SELECT Row_number()
 	   a.DESCRIPTION2					AS ItemDescription2,
        e.ClinicalDescription               AS ItemClinicalDescription,
        a.ACTIVE_STATUS                     AS ActiveStatus,
-       b.DESCRIPTION                        AS ItemManufacturer,
+       a.MANUF_NBR                         AS ItemManufacturer, --b.DESCRIPTION
        a.MANUF_NBR                         AS ItemManufacturerNumber,
        d.VENDOR_VNAME                      AS ItemVendor,
        c.VENDOR                            AS ItemVendorNumber,
@@ -280,12 +312,12 @@ SELECT Row_number()
        + ' EA' + '/'+Ltrim(Rtrim(h.UOM)) AS PackageString
 INTO   bluebin.DimItem
 FROM   ITEMMAST a
-       LEFT JOIN ICMANFCODE b
-              ON a.MANUF_CODE = b.MANUF_CODE
+       --LEFT JOIN ICMANFCODE b
+       --       ON a.MANUF_CODE = b.MANUF_CODE
        LEFT JOIN ITEMSRC c
               ON a.ITEM = c.ITEM
                  AND c.REPLENISH_PRI = 1
-                 AND c.LOCATION = @PrimaryLocation
+                 AND c.LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
        LEFT JOIN APVENMAST d
               ON c.VENDOR = d.VENDOR
        LEFT JOIN #ClinicalDescriptions e
@@ -739,11 +771,11 @@ SELECT
 		END AS REQ_NUMBER,
        a.SRC_LINE_NBR                                                                         AS LINE_NBR,
        MIN(Cast(CONVERT(VARCHAR, b.REC_DATE, 101) + ' '
-            + LEFT(RIGHT('00000' + CONVERT(VARCHAR, UPDATE_TIME), 8), 2)
+			+ LEFT(RIGHT('00000' + CONVERT(VARCHAR, case when b.UPDATE_TIME is null then '00000000' else b.UPDATE_TIME end), 8), 2)
             + ':'
-            + Substring(RIGHT('00000' + CONVERT(VARCHAR, UPDATE_TIME), 8), 3, 2)
+            + Substring(RIGHT('00000' + CONVERT(VARCHAR, case when b.UPDATE_TIME is null then '00000000' else b.UPDATE_TIME end), 8), 3, 2)
             + ':'
-            + Substring(RIGHT('00000' + CONVERT(VARCHAR, UPDATE_TIME), 8), 5, 2) AS DATETIME)) AS REC_DATE
+            + Substring(RIGHT('00000' + CONVERT(VARCHAR, case when b.UPDATE_TIME is null then '00000000' else b.UPDATE_TIME end), 8), 5, 2) AS DATETIME)) AS REC_DATE
 INTO #POLINE
 FROM   POLINESRC a
        INNER JOIN PORECLINE b
@@ -1567,7 +1599,8 @@ DECLARE
 	@Step	int,
 	@StepProc varchar(255),
 	@StepTable nvarchar(255),
-	@SQL nvarchar(max)
+	@SQL nvarchar(max),
+	@Active int
 
 
 -- Initialize etl.JobHeader and insert row for current run
@@ -1593,7 +1626,7 @@ BEGIN
 SET @StepName = (SELECT StepName FROM etl.JobSteps WHERE StepNumber = @Step)
 SET @StepProc = (SELECT StepProcedure FROM etl.JobSteps WHERE StepNumber = @Step)
 SET @StepTable = (SELECT StepTable FROM etl.JobSteps WHERE StepNumber = @Step)
-
+SET @Active = (SELECT ActiveFlag FROM etl.JobSteps WHERE StepNumber = @Step)
 
 INSERT INTO [etl].[JobDetails]
            ([ProcessID]
@@ -1606,7 +1639,10 @@ INSERT INTO [etl].[JobDetails]
 
 BEGIN TRY
 
+IF @Active = 1
+BEGIN
 EXEC ('EXEC ' + @StepProc)
+END
 
 SET @SQL = 'SELECT @RowCount=COUNT(*) FROM ' + @StepTable
 EXECUTE sp_executesql @SQL, N'@RowCount int OUTPUT', @RowCount = @RowCount OUTPUT
@@ -1614,8 +1650,8 @@ EXECUTE sp_executesql @SQL, N'@RowCount int OUTPUT', @RowCount = @RowCount OUTPU
 
 UPDATE [etl].[JobDetails]
    SET [EndTime] = GETDATE()
-      ,[RowCount] = @RowCount
-      ,[Result] = 'Success'
+      ,[RowCount] = case when @Active = 0 then @Active else @RowCount end
+      ,[Result] = case when @Active = 0 then 'InActive Step' else 'Success' end
 	  ,[Message] = ERROR_MESSAGE()
  WHERE ProcessID = @ProcessID AND StepName = @StepName
  
@@ -1631,8 +1667,8 @@ BEGIN CATCH
 
 UPDATE [etl].[JobDetails]
    SET [EndTime] = GETDATE()
-      ,[RowCount] = @RowCount
-      ,[Result] = 'Failure'
+      ,[RowCount] = case when @Active = 0 then @Active else @RowCount end
+      ,[Result] = case when @Active = 0 then 'InActive Step' else 'Failure' end
 	  ,[Message] = ERROR_MESSAGE()
  WHERE ProcessID = @ProcessID AND StepName = @StepName
  
@@ -1643,6 +1679,7 @@ UPDATE [etl].[JobHeader]
 
 
 END CATCH
+
 
 SET @Step = @Step + 1
 
@@ -1707,10 +1744,10 @@ FROM   ITEMLOC a
                   AND a.GL_CATEGORY = c.GL_CATEGORY
 		INNER JOIN bluebin.DimLocation d
 		ON a.LOCATION = d.LocationID
-		INNER JOIN ICLOCATION e
-		ON a.COMPANY = e.COMPANY
-		AND a.LOCATION = e.LOCATION
-WHERE e.LOCATION_TYPE <> 'P'
+--		INNER JOIN ICLOCATION e
+--		ON a.COMPANY = e.COMPANY
+--		AND a.LOCATION = e.LOCATION
+--WHERE e.LOCATION_TYPE <> 'P'
  
 GO
 
@@ -1967,6 +2004,7 @@ SET NOCOUNT ON
 SELECT 
 	a.ITEM as LawsonItemNumber,
 	ISNULL(c.MANUF_NBR,'N/A') as ItemManufacturerNumber,
+	c.DESCRIPTION as [Description],
 	ISNULL(b.ClinicalDescription,'*NEEDS*') as ClinicalDescription,
 	a.LOCATION as LocationCode,
 	a.NAME as LocationName,
@@ -1988,7 +2026,8 @@ LEFT JOIN
 	ITEM, 
 	USER_FIELD3 as ClinicalDescription
 FROM ITEMLOC 
-WHERE LOCATION IN (SELECT [ConfigValue] FROM [bluebin].[Config] WHERE  [ConfigName] = 'LOCATION' AND Active = 1) AND LEN(LTRIM(USER_FIELD3)) > 0) b
+WHERE LOCATION IN (SELECT [ConfigValue] FROM [bluebin].[Config] WHERE  [ConfigName] = 'LOCATION' AND Active = 1) AND LEN(LTRIM(USER_FIELD3)) > 0
+) b
 ON a.ITEM = b.ITEM
 left join ITEMMAST c on a.ITEM = c.ITEM
 
@@ -2646,7 +2685,7 @@ select
 			dl.BlueBinFlag,
 	u.LastName + ', ' + u.FirstName  as Auditer,
     u.[UserLogin] as Login,
-	bbr.RoleName,
+	u.Title as RoleName,
 	g.PS_TotalScore,
 	g.RS_TotalScore,
 	g.SS_TotalScore,
@@ -2756,7 +2795,7 @@ where
 (BinOrderChange != 0 or BinChange != 0)
 	and BinUOM = OrderUOM 
 		and OrderQty is not null
-			and [Week] = datepart(WEEK,getdate())
+			and [Date] >= getdate() -7
 order by LocationName,ItemDescription,[Date]
 END
 GO

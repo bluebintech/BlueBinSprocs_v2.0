@@ -6,16 +6,17 @@ GO
 
 CREATE PROCEDURE sp_EditUser
 @BlueBinUserID int,
-@UserLogin varchar(30),
+@UserLogin varchar(60),
 @FirstName varchar(30), 
 @LastName varchar(30), 
 @MiddleName varchar(30), 
 @Active int,
-@Email varchar(50), 
+@Email varchar(60), 
 @MustChangePassword int,
 @PasswordExpires int,
 @Password varchar(50),
-@RoleName  varchar(30)
+@RoleName  varchar(30),
+@Title varchar(50)
 
 
 --WITH ENCRYPTION
@@ -32,11 +33,12 @@ IF (@Password = '' or @Password is null)
         LastName = @LastName, 
         MiddleName = @MiddleName, 
         Active = @Active,
-        Email = @Email, 
+        Email = @UserLogin,--@Email, 
         LastUpdated = getdate(), 
         MustChangePassword = @MustChangePassword,
         PasswordExpires = @PasswordExpires,
-        RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName)
+        RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName),
+		Title = @Title
 		Where BlueBinUserID = @BlueBinUserID
 	END
 	ELSE
@@ -46,18 +48,19 @@ IF (@Password = '' or @Password is null)
         LastName = @LastName, 
         MiddleName = @MiddleName, 
         Active = @Active,
-        Email = @Email, 
+        Email = @UserLogin,--@Email, 
         LastUpdated = getdate(), 
         MustChangePassword = @MustChangePassword,
         PasswordExpires = @PasswordExpires,
 		[Password] = (HASHBYTES('SHA1', @newpwdHash)),
-        RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName)
+        RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName),
+		Title = @Title
 		Where BlueBinUserID = @BlueBinUserID
 	END
 
 	;
 	set @message = 'User Updated - '+ @UserLogin
-	select @fakelogin = UserLogin from bluebin.BlueBinUser where BlueBinUserID = 1
+	select @fakelogin = 'gbutler@bluebin.com'
 	exec sp_InsertMasterLog @fakelogin,'Users',@message,@BlueBinUserID
 END
 GO

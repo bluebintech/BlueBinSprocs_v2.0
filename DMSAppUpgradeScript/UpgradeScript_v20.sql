@@ -70,12 +70,26 @@ update bluebin.BlueBinUser set Email = email;
 alter table bluebin.BlueBinUser drop column email;
 END
 */
+ALTER TABLE bluebin.BlueBinUser ALTER COLUMN UserLogin varchar(60)
+GO
+ALTER TABLE bluebin.BlueBinUser ALTER COLUMN Email varchar(60)
+GO
+ALTER TABLE bluebin.BlueBinResource ALTER COLUMN [Login] varchar(60)
+GO
+ALTER TABLE bluebin.BlueBinResource ALTER COLUMN Email varchar(60)
+GO
 ALTER TABLE bluebin.Config ALTER COLUMN ConfigValue varchar(100)
 GO
 
 if not exists(select * from sys.columns where name = 'Description' and object_id = (select object_id from sys.tables where name = 'BlueBinOperations'))
 BEGIN
 ALTER TABLE bluebin.BlueBinOperations ADD [Description] varchar(255);
+END
+GO
+
+if not exists(select * from sys.columns where name = 'Title' and object_id = (select object_id from sys.tables where name = 'BlueBinUser'))
+BEGIN
+ALTER TABLE bluebin.BlueBinUser ADD [Title] varchar(50);
 END
 GO
 
@@ -175,7 +189,9 @@ select
 RoleID,--(select RoleID from bluebin.BlueBinRoles where RoleName = 'Manager'),
 OpID
 from  [bluebin].[BlueBinOperations],bluebin.BlueBinRoles 
-WHERE OpName like 'ADMIN%' and RoleName in ('Manager','Supervisor','BlueBinPersonnel','BlueBelt')
+WHERE OpName like 'ADMIN%' and RoleName in ('SuperUser','BlueBinPersonnel','BlueBelt')
+
+delete from bluebin.BlueBinRoleOperations where OpID = (select OpID from bluebin.BlueBinOperations where OpName = 'ADMIN-CONFIG') and RoleID in (Select RoleID from bluebin.BlueBinRoles where RoleName in ('SuperUser','BlueBelt'))
 
 END
 GO
@@ -325,7 +341,7 @@ CREATE TABLE [bluebin].[BlueBinResource](
 	[LastName] varchar (30) NOT NULL,
 	[MiddleName] varchar (30) NULL,
     [Login] varchar (30) NULL,
-	[Email] varchar (50) NULL,
+	[Email] varchar (60) NULL,
 	[Phone] varchar (20) NULL,
 	[Cell] varchar (20) NULL,
 	[Title] varchar (50) NULL,
@@ -342,11 +358,11 @@ if not exists (select * from sys.tables where name = 'BlueBinUser')
 BEGIN
 CREATE TABLE [bluebin].[BlueBinUser](
 	[BlueBinUserID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
-	[UserLogin] varchar (30) NOT NULL,
+	[UserLogin] varchar (60) NOT NULL,
 	[FirstName] varchar (30) NOT NULL,
 	[LastName] varchar (30) NOT NULL,
 	[MiddleName] varchar (30) NULL,
-    [Email] varchar (50) NULL,
+    [Email] varchar (60) NULL,
     [Active] int not null,
 	[Password] varchar(30) not null,
 	[RoleID] int null,
@@ -378,11 +394,9 @@ ALTER TABLE [bluebin].[BlueBinUser] WITH CHECK ADD FOREIGN KEY([RoleID])
 REFERENCES [bluebin].[BlueBinRoles] ([RoleID])
 
 insert into [bluebin].[BlueBinRoles] (RoleName) VALUES
+('User'),
 ('BlueBelt'),
 ('BlueBinPersonnel'),
-('Manager'),
-('Supervisor'),
-('Tech'),
 ('SuperUser')
 
 END
@@ -631,6 +645,64 @@ Print 'Table Adds Complete'
 --*****************************************************
 --**************************SPROC**********************
 
+if exists (select * from dbo.sysobjects where id = object_id(N'ssp_BBS') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure ssp_BBS
+GO
+
+--exec ssp_BBS 'Demo'
+
+CREATE PROCEDURE ssp_BBS
+@DB varchar(10)
+
+--WITH ENCRYPTION
+AS
+BEGIN
+
+
+IF Exists (select * from sys.databases where name = 'UTMC')
+BEGIN
+DECLARE @DBTable Table (Name varchar(20),[id] int)
+declare @SQL nvarchar(max)
+
+set @SQL = 'USE ['+@DB+']
+
+DECLARE @Status Table (Client varchar(20),QueryRunDateTime datetime,MaxReqDate datetime,[SourceUpToDate] varchar(3),MaxSnapshotDate datetime,[DBUpToDate] varchar(3))
+
+insert into @Status
+select 
+	DB_NAME(),
+	getdate(),
+	convert(date,max(CREATION_DATE)) as [MaxReqDate],
+	case when convert(date,max(CREATION_DATE)) > getdate() -2 then ''YES'' else ''NO'' end,
+	db.[MaxSnapshotDate],
+	db.[DBUpToDate?]
+from dbo.REQLINE,
+		(select 
+		DB_NAME() as Client,
+		convert(date,max(LastScannedDate)) as [MaxSnapshotDate],
+		case when convert(date,max(LastScannedDate)) > getdate() -2 then ''YES'' else ''NO'' end as [DBUpToDate?]
+		from bluebin.FactBinSnapshot
+		where LastScannedDate > getdate() -7
+		) db 
+where CREATION_DATE > getdate() -7
+group by 	
+	db.[MaxSnapshotDate],
+	db.[DBUpToDate?]
+
+
+	select * from @Status
+
+	'
+
+EXEC (@SQL)
+
+END
+END
+GO
+grant exec on ssp_BBS to public
+GO
+
+
 --*****************************************************
 --**************************SPROC**********************
 
@@ -866,7 +938,7 @@ GO
 --exec sp_ValidateBlueBinRole 'dhagan@bluebin.com','ADMIN-CONFIG'
 
 CREATE PROCEDURE [dbo].[sp_ValidateBlueBinRole]
-      @UserLogin NVARCHAR(30),
+      @UserLogin NVARCHAR(60),
 	  @OpName NVARCHAR(50)
 AS
 BEGIN
@@ -1079,7 +1151,7 @@ exec sp_InsertScanBatch @Location,@Scanner
 */
 
 CREATE PROCEDURE sp_InsertScanBatch
-@Location char(5),
+@Location char(7),
 @Scanner varchar(255)
 
 
@@ -1273,67 +1345,6 @@ END
 GO
 grant exec on sp_SelectHardwareCustomer to appusers
 GO
---*****************************************************
---**************************SPROC**********************
-
-if exists (select * from dbo.sysobjects where id = object_id(N'tb_QCNDashboard') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure tb_QCNDashboard
-GO
-
---exec tb_QCNDashboard 
-CREATE PROCEDURE tb_QCNDashboard
-
---WITH ENCRYPTION
-AS
-BEGIN
-SET NOCOUNT ON
-
-select 
-	q.[QCNID],
-	q.[LocationID],
-        dl.[LocationName],
-		db.BinSequence,
-	u.LastName + ', ' + u.FirstName  as RequesterUserName,
-        u.[Login] as RequesterLogin,
-    u.[Title] as RequesterTitleName,
-    case when v.Login = 'None' then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
-        v.[Login] as AssignedLogin,
-    v.[Title] as AssignedTitleName,
-	qt.Name as QCNType,
-q.[ItemID],
-di.[ItemClinicalDescription],
-db.[BinQty] as Par,
-db.[BinUOM] as UOM,
-di.[ItemManufacturer],
-di.[ItemManufacturerNumber],
-	q.[Details] as [DetailsText],
-            case when q.[Details] ='' then 'No' else 'Yes' end Details,
-	q.[Updates] as [UpdatesText],
-            case when q.[Updates] ='' then 'No' else 'Yes' end Updates,
-	case when qs.Status = 'Completed' then convert(int,(q.[DateCompleted] - q.[DateEntered]))
-		else convert(int,(getdate() - q.[DateEntered])) end as DaysOpen,
-            q.[DateEntered],
-	q.[DateCompleted],
-	qs.Status,
-    case when db.BinCurrentStatus is null then 'N/A' else db.BinCurrentStatus end as BinStatus,
-    q.[LastUpdated]
-from [qcn].[QCN] q
-left join [bluebin].[DimBin] db on q.LocationID = db.LocationID and rtrim(q.ItemID) = rtrim(db.ItemID)
-left join [bluebin].[DimItem] di on rtrim(q.ItemID) = rtrim(di.ItemID)
-        inner join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
-inner join [bluebin].[BlueBinResource] u on q.RequesterUserID = u.BlueBinResourceID
-left join [bluebin].[BlueBinResource] v on q.AssignedUserID = v.BlueBinResourceID
-inner join [qcn].[QCNType] qt on q.QCNTypeID = qt.QCNTypeID
-inner join [qcn].[QCNStatus] qs on q.QCNStatusID = qs.QCNStatusID
-
-WHERE q.Active = 1 
-            order by q.[DateEntered] asc--,convert(int,(getdate() - q.[DateEntered])) desc
-
-END
-GO
-grant exec on tb_QCNDashboard to public
-GO
-
 
 
 --*****************************************************
@@ -1372,7 +1383,7 @@ select
     v.[Title] as AssignedTitleName,
 	qt.Name as QCNType,
 q.[ItemID],
-di.[ItemClinicalDescription],
+COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description') as ItemClinicalDescription,
 db.[BinQty] as Par,
 db.[BinUOM] as UOM,
 di.[ItemManufacturer],
@@ -1561,8 +1572,8 @@ CREATE PROCEDURE sp_EditBlueBinResource
 ,@FirstName varchar (30)
 ,@LastName varchar (30)
 ,@MiddleName varchar (30)
-,@Login varchar (30)
-,@Email varchar (50)
+,@Login varchar (60)
+,@Email varchar (60)
 ,@Phone varchar (20)
 ,@Cell varchar (20)
 ,@Title varchar (50)
@@ -1953,8 +1964,8 @@ CREATE PROCEDURE sp_InsertBlueBinResource
 @LastName varchar (30)
 ,@FirstName varchar (30)
 ,@MiddleName varchar (30)
-,@Login varchar (30)
-,@Email varchar (50)
+,@Login varchar (60)
+,@Email varchar (60)
 ,@Phone varchar (20)
 ,@Cell varchar (20)
 ,@Title varchar (50)
@@ -2032,7 +2043,7 @@ drop procedure sp_InsertMasterLog
 GO
 
 CREATE PROCEDURE sp_InsertMasterLog
-@UserLogin varchar (30)
+@UserLogin varchar (60)
 ,@ActionType varchar (30)
 ,@ActionName varchar (50)
 ,@ActionID int
@@ -2595,7 +2606,7 @@ GO
 --exec sp_UpdateImages 'gbutler@bluebin.com','151116'
 CREATE PROCEDURE sp_UpdateImages
 @GembaAuditNodeID int,
-@UserLogin varchar(100),
+@UserLogin varchar(60),
 @ImageSourceIDPH int 
 
 
@@ -2625,12 +2636,13 @@ GO
 
 
 CREATE PROCEDURE sp_InsertUser
-@UserLogin varchar(30),
+@UserLogin varchar(60),
 @FirstName varchar(30), 
 @LastName varchar(30), 
 @MiddleName varchar(30), 
 @RoleName  varchar(30),
-@Email varchar(50)
+@Email varchar(60),
+@Title varchar(50)
 	
 --WITH ENCRYPTION
 AS
@@ -2648,13 +2660,13 @@ set @newpwdHash = convert(varbinary(max),rtrim(@RandomPassword))
 
 if not exists (select BlueBinUserID from bluebin.BlueBinUser where UserLogin = @UserLogin)
 	BEGIN
-	insert into bluebin.BlueBinUser (UserLogin,FirstName,LastName,MiddleName,RoleID,MustChangePassword,PasswordExpires,[Password],Email,Active,LastUpdated,LastLoginDate)
+	insert into bluebin.BlueBinUser (UserLogin,FirstName,LastName,MiddleName,RoleID,MustChangePassword,PasswordExpires,[Password],Email,Active,LastUpdated,LastLoginDate,Title)
 	VALUES
-	(@UserLogin,@FirstName,@LastName,@MiddleName,@RoleID,1,@DefaultExpiration,(HASHBYTES('SHA1', @newpwdHash)),@Email,1,getdate(),getdate())
+	(@UserLogin,@FirstName,@LastName,@MiddleName,@RoleID,1,@DefaultExpiration,(HASHBYTES('SHA1', @newpwdHash)),@Email,1,getdate(),getdate(),@Title)
 	;
 	SET @NewBlueBinUserID = SCOPE_IDENTITY()
 	set @message = 'New User Created - '+ @UserLogin
-	select @fakelogin = UserLogin from bluebin.BlueBinUser where BlueBinUserID = 1
+	select @fakelogin = 'gbutler@bluebin.com'
 		exec sp_InsertMasterLog @UserLogin,'Users',@message,@NewBlueBinUserID      
 	;
 	Select p from @table
@@ -2666,13 +2678,12 @@ if not exists (select BlueBinUserID from bluebin.BlueBinUser where UserLogin = @
 	
 	if not exists (select BlueBinResourceID from bluebin.BlueBinResource where FirstName = @FirstName and LastName = @LastName)--select * from bluebin.BlueBinResource
 	BEGIN
-	exec sp_InsertBlueBinResource @FirstName,@LastName,@MiddleName,@UserLogin,@Email,'','',@RoleName
+	exec sp_InsertBlueBinResource @LastName,@FirstName,@MiddleName,@UserLogin,@Email,'','',@Title
 	END
 END
 GO
 grant exec on sp_InsertUser to appusers
 GO
-
 
 
 
@@ -2687,16 +2698,17 @@ GO
 
 CREATE PROCEDURE sp_EditUser
 @BlueBinUserID int,
-@UserLogin varchar(30),
+@UserLogin varchar(60),
 @FirstName varchar(30), 
 @LastName varchar(30), 
 @MiddleName varchar(30), 
 @Active int,
-@Email varchar(50), 
+@Email varchar(60), 
 @MustChangePassword int,
 @PasswordExpires int,
 @Password varchar(50),
-@RoleName  varchar(30)
+@RoleName  varchar(30),
+@Title varchar(50)
 
 
 --WITH ENCRYPTION
@@ -2713,11 +2725,12 @@ IF (@Password = '' or @Password is null)
         LastName = @LastName, 
         MiddleName = @MiddleName, 
         Active = @Active,
-        Email = @Email, 
+        Email = @UserLogin,--@Email, 
         LastUpdated = getdate(), 
         MustChangePassword = @MustChangePassword,
         PasswordExpires = @PasswordExpires,
-        RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName)
+        RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName),
+		Title = @Title
 		Where BlueBinUserID = @BlueBinUserID
 	END
 	ELSE
@@ -2727,24 +2740,24 @@ IF (@Password = '' or @Password is null)
         LastName = @LastName, 
         MiddleName = @MiddleName, 
         Active = @Active,
-        Email = @Email, 
+        Email = @UserLogin,--@Email, 
         LastUpdated = getdate(), 
         MustChangePassword = @MustChangePassword,
         PasswordExpires = @PasswordExpires,
 		[Password] = (HASHBYTES('SHA1', @newpwdHash)),
-        RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName)
+        RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName),
+		Title = @Title
 		Where BlueBinUserID = @BlueBinUserID
 	END
 
 	;
 	set @message = 'User Updated - '+ @UserLogin
-	select @fakelogin = UserLogin from bluebin.BlueBinUser where BlueBinUserID = 1
+	select @fakelogin = 'gbutler@bluebin.com'
 	exec sp_InsertMasterLog @fakelogin,'Users',@message,@BlueBinUserID
 END
 GO
 grant exec on sp_EditUser to appusers
 GO
-
 
 --*****************************************************
 --**************************SPROC**********************
@@ -2777,6 +2790,7 @@ SET NOCOUNT ON
       ,[LastUpdated]
       ,bbur.RoleID
 	  ,bbur.RoleName
+	  ,[Title]
       ,[LastLoginDate]
       ,[MustChangePassword]
 	  ,	case 
@@ -2914,7 +2928,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_ForgotPassword
 drop procedure sp_ForgotPasswordBlueBinUser
 GO
 CREATE PROCEDURE sp_ForgotPasswordBlueBinUser
-      @UserLogin NVARCHAR(30)
+      @UserLogin NVARCHAR(60)
 AS
 BEGIN
       SET NOCOUNT ON;
@@ -2926,7 +2940,7 @@ BEGIN
      
       IF @BlueBinUserID IS NOT NULL  
       BEGIN
-            DECLARE @UserTable TABLE (BlueBinUserID int, UserLogin varchar(50), pwd varchar(10),created datetime)
+            DECLARE @UserTable TABLE (BlueBinUserID int, UserLogin varchar(60), pwd varchar(10),created datetime)
 			declare @table table (p varchar(50))
 
 			insert @table exec sp_GeneratePassword 8 
@@ -2963,7 +2977,7 @@ GO
 --grant exec on sp_ValidateBlueBinUser to appusers
 
 CREATE PROCEDURE [dbo].[sp_ValidateBlueBinUser]
-      @UserLogin NVARCHAR(30),
+      @UserLogin NVARCHAR(60),
       @Password varchar(max)
 AS
 BEGIN
@@ -3026,7 +3040,7 @@ drop procedure sp_ChangePasswordBlueBinUser
 GO
 
 CREATE PROCEDURE [dbo].[sp_ChangePasswordBlueBinUser]
-      @UserLogin NVARCHAR(30),
+      @UserLogin NVARCHAR(60),
       @OldPassword varchar(max),
 	  @NewPassword varchar(max),
 	  @ConfirmNewPassword varchar(max)
@@ -3476,7 +3490,7 @@ CREATE PROCEDURE sp_InsertQCN
 @Details varchar(max),
 @Updates varchar(max),
 @QCNStatus varchar(255),
-@UserLogin varchar (30)
+@UserLogin varchar (60)
 
 
 --WITH ENCRYPTION
@@ -3577,22 +3591,25 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCNLocat
 drop procedure sp_SelectQCNLocation
 GO
 
---exec sp_SelectQCN ''
+--exec sp_SelectQCNLocation
 CREATE PROCEDURE sp_SelectQCNLocation
 
 --WITH ENCRYPTION
 AS
 BEGIN
 SET NOCOUNT ON
-Select distinct a.LocationID,rTrim(a.ItemID) as ItemID,b.ItemClinicalDescription,rTrim(a.ItemID)+ ' - ' + b.ItemClinicalDescription as ExtendedDescription from [bluebin].[DimBin] a 
-                                inner join [bluebin].[DimItem] b on rtrim(a.ItemID) = rtrim(b.ItemID)  where b.ItemClinicalDescription is not null 
-								UNION select distinct LocationID,'' as ItemID,'' as ItemClinicalDescription, ''  as ExtendedDescription from [bluebin].[DimBin]
-                                       order by rTrim(a.ItemID)+ ' - ' + b.ItemClinicalDescription asc
+Select distinct a.LocationID,rTrim(a.ItemID) as ItemID,COALESCE(b.ItemClinicalDescription,b.ItemDescription,'No Description'),rTrim(a.ItemID)+ ' - ' + COALESCE(b.ItemClinicalDescription,b.ItemDescription,'No Description') as ExtendedDescription 
+from [bluebin].[DimBin] a 
+                                inner join [bluebin].[DimItem] b on rtrim(a.ItemID) = rtrim(b.ItemID)  
+								UNION 
+								select distinct LocationID,'' as ItemID,'' as ItemClinicalDescription, ''  as ExtendedDescription from [bluebin].[DimBin]
+                                       order by rTrim(a.ItemID)+ ' - ' + COALESCE(b.ItemClinicalDescription,b.ItemDescription,'No Description') asc
 
 END
 GO
 grant exec on sp_SelectQCNLocation to appusers
 GO
+
 
 
 --*****************************************************
@@ -3607,7 +3624,7 @@ CREATE PROCEDURE sp_InsertImage
 @ImageName varchar(100),
 @ImageType varchar(10),
 @ImageSource varchar(100),
-@UserLogin varchar(100),
+@UserLogin varchar(60),
 @ImageSourceID int,
 @Image varbinary(max)
 
@@ -3643,7 +3660,7 @@ GO
 --exec sp_SelectImages '','gbutler@bluebin.com','151116'
 CREATE PROCEDURE sp_SelectImages
 @GembaAuditNodeID int,
-@UserLogin varchar(100),
+@UserLogin varchar(60),
 @ImageSourceIDPH int 
 
 
@@ -3676,7 +3693,7 @@ GO
 
 --exec sp_DeleteImages 'gbutler@bluebin.com','151116'
 CREATE PROCEDURE sp_DeleteImages
-@UserLogin varchar(100),
+@UserLogin varchar(60),
 @ImageSourceIDPH int 
 
 
@@ -3723,9 +3740,9 @@ CREATE PROCEDURE [dbo].[sp_InsertBlueBinUser]
 AS
 BEGIN
 
-DECLARE @UserTable TABLE (iid int identity (1,1) PRIMARY KEY,BlueBinUserID_id int, UserLogin varchar(255),LastName varchar(15),FirstName varchar(15),Email varchar(50),RoleName varchar (20), [Password] varchar(50),Created int);
+DECLARE @UserTable TABLE (iid int identity (1,1) PRIMARY KEY,BlueBinUserID_id int, UserLogin varchar(255),LastName varchar(30),FirstName varchar(30),Email varchar(60),RoleName varchar (20), [Password] varchar(50),Created int);
 DECLARE @length int = 8, @p varchar(50)
-declare @iid int,@UserLogin varchar(255),@LastName varchar(15),@FirstName varchar(15),@Email varchar(50), @Password varbinary(max), @RoleID int, @RoleName varchar(20)
+declare @iid int,@UserLogin varchar(255),@LastName varchar(30),@FirstName varchar(30),@Email varchar(60), @Password varbinary(max), @RoleID int, @RoleName varchar(20)
 
 
 

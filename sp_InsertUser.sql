@@ -6,12 +6,13 @@ GO
 
 
 CREATE PROCEDURE sp_InsertUser
-@UserLogin varchar(30),
+@UserLogin varchar(60),
 @FirstName varchar(30), 
 @LastName varchar(30), 
 @MiddleName varchar(30), 
 @RoleName  varchar(30),
-@Email varchar(50)
+@Email varchar(60),
+@Title varchar(50)
 	
 --WITH ENCRYPTION
 AS
@@ -29,13 +30,13 @@ set @newpwdHash = convert(varbinary(max),rtrim(@RandomPassword))
 
 if not exists (select BlueBinUserID from bluebin.BlueBinUser where UserLogin = @UserLogin)
 	BEGIN
-	insert into bluebin.BlueBinUser (UserLogin,FirstName,LastName,MiddleName,RoleID,MustChangePassword,PasswordExpires,[Password],Email,Active,LastUpdated,LastLoginDate)
+	insert into bluebin.BlueBinUser (UserLogin,FirstName,LastName,MiddleName,RoleID,MustChangePassword,PasswordExpires,[Password],Email,Active,LastUpdated,LastLoginDate,Title)
 	VALUES
-	(@UserLogin,@FirstName,@LastName,@MiddleName,@RoleID,1,@DefaultExpiration,(HASHBYTES('SHA1', @newpwdHash)),@Email,1,getdate(),getdate())
+	(@UserLogin,@FirstName,@LastName,@MiddleName,@RoleID,1,@DefaultExpiration,(HASHBYTES('SHA1', @newpwdHash)),@UserLogin,1,getdate(),getdate(),@Title)
 	;
 	SET @NewBlueBinUserID = SCOPE_IDENTITY()
 	set @message = 'New User Created - '+ @UserLogin
-	select @fakelogin = UserLogin from bluebin.BlueBinUser where BlueBinUserID = 1
+	select @fakelogin = 'gbutler@bluebin.com'
 		exec sp_InsertMasterLog @UserLogin,'Users',@message,@NewBlueBinUserID      
 	;
 	Select p from @table
@@ -47,7 +48,7 @@ if not exists (select BlueBinUserID from bluebin.BlueBinUser where UserLogin = @
 	
 	if not exists (select BlueBinResourceID from bluebin.BlueBinResource where FirstName = @FirstName and LastName = @LastName)--select * from bluebin.BlueBinResource
 	BEGIN
-	exec sp_InsertBlueBinResource @FirstName,@LastName,@MiddleName,@UserLogin,@Email,'','',@RoleName
+	exec sp_InsertBlueBinResource @LastName,@FirstName,@MiddleName,@UserLogin,@UserLogin,'','',@Title
 	END
 END
 GO

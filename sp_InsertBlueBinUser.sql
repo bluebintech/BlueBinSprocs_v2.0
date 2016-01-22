@@ -19,9 +19,9 @@ CREATE PROCEDURE [dbo].[sp_InsertBlueBinUser]
 AS
 BEGIN
 
-DECLARE @UserTable TABLE (iid int identity (1,1) PRIMARY KEY,BlueBinUserID_id int, UserLogin varchar(255),LastName varchar(15),FirstName varchar(15),Email varchar(50),RoleName varchar (20), [Password] varchar(50),Created int);
+DECLARE @UserTable TABLE (iid int identity (1,1) PRIMARY KEY,BlueBinUserID_id int, UserLogin varchar(255),LastName varchar(30),FirstName varchar(30),Email varchar(60),RoleName varchar (20), [Password] varchar(50),Created int);
 DECLARE @length int = 8, @p varchar(50)
-declare @iid int,@UserLogin varchar(255),@LastName varchar(15),@FirstName varchar(15),@Email varchar(50), @Password varbinary(max), @RoleID int, @RoleName varchar(20)
+declare @iid int,@UserLogin varchar(255),@LastName varchar(30),@FirstName varchar(30),@Email varchar(30), @Password varbinary(max), @RoleID int, @RoleName varchar(20)
 
 
 
@@ -36,7 +36,8 @@ insert @UserTable (BlueBinUserID_id, UserLogin,LastName,FirstName,Email, RoleNam
 (0,'snevins@bluebin.com','Nevins','Sabrina','snevins@bluebin.com','BlueBinPersonnel','',0),
 (0,'chodge@bluebin.com','Hodge','Charles','chodge@bluebin.com','BlueBinPersonnel','',0),
 (0,'rswan@bluebin.com','Swan','Robb','rswan@bluebin.com','BlueBinPersonnel','',0),
-(0,'cpetschke@bluebin.com','Petschke','Carl','cpetschke@bluebin.com','BlueBinPersonnel','',0)
+(0,'cpetschke@bluebin.com','Petschke','Carl','cpetschke@bluebin.com','BlueBinPersonnel','',0),
+(0,'catteberry@bluebin.com','Atteberry','Chris','catteberry@bluebin.com','BlueBinPersonnel','',0)
 
 
 /*Create generic passwords*/
@@ -48,7 +49,7 @@ begin
 	insert @table exec sp_GeneratePassword @length 
 	update @UserTable set [Password] = 
 		case	
-			when @UseGeneric = 'Yes' then 'Pa55w0rd!'
+			when @UseGeneric = 'Yes' then '12345!'
 			when @UseGeneric = 'No' then (select p from @table) 
 			else 'Error!'
 		end

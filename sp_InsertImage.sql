@@ -7,7 +7,7 @@ CREATE PROCEDURE sp_InsertImage
 @ImageName varchar(100),
 @ImageType varchar(10),
 @ImageSource varchar(100),
-@UserLogin varchar(100),
+@UserLogin varchar(60),
 @ImageSourceID int,
 @Image varbinary(max)
 

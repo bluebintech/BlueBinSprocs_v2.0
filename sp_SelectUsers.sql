@@ -26,6 +26,7 @@ SET NOCOUNT ON
       ,[LastUpdated]
       ,bbur.RoleID
 	  ,bbur.RoleName
+	  ,[Title]
       ,[LastLoginDate]
       ,[MustChangePassword]
 	  ,	case 

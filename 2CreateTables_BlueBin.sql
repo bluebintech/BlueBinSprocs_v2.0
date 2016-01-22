@@ -69,7 +69,7 @@ CREATE TABLE [bluebin].[BlueBinResource](
 	[LastName] varchar (30) NOT NULL,
 	[MiddleName] varchar (30) NULL,
     [Login] varchar (30) NULL,
-	[Email] varchar (50) NULL,
+	[Email] varchar (60) NULL,
 	[Phone] varchar (20) NULL,
 	[Cell] varchar (20) NULL,
 	[Title] varchar (50) NULL,
@@ -84,11 +84,12 @@ if not exists (select * from sys.tables where name = 'BlueBinUser')
 BEGIN
 CREATE TABLE [bluebin].[BlueBinUser](
 	[BlueBinUserID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
-	[UserLogin] varchar (30) NOT NULL,
+	[UserLogin] varchar (60) NOT NULL,
 	[FirstName] varchar (30) NOT NULL,
 	[LastName] varchar (30) NOT NULL,
 	[MiddleName] varchar (30) NULL,
-    [Email] varchar (50) NULL,
+	[Title] varchar (50) NULL,
+    [Email] varchar (60) NULL,
     [Active] int not null,
 	[Password] varchar(30) not null,
 	[RoleID] int null,
@@ -136,11 +137,9 @@ ALTER TABLE [bluebin].[BlueBinUser] WITH CHECK ADD FOREIGN KEY([RoleID])
 REFERENCES [bluebin].[BlueBinRoles] ([RoleID])
 
 insert into [bluebin].[BlueBinRoles] (RoleName) VALUES
+('User'),
 ('BlueBelt'),
 ('BlueBinPersonnel'),
-('Manager'),
-('Supervisor'),
-('Tech'),
 ('SuperUser')
 
 END
@@ -178,7 +177,10 @@ select
 RoleID,--(select RoleID from bluebin.BlueBinRoles where RoleName = 'Manager'),
 OpID
 from  [bluebin].[BlueBinOperations],bluebin.BlueBinRoles 
-WHERE OpName like 'ADMIN%' and RoleName in ('Manager','Supervisor','BlueBinPersonnel','BlueBelt')
+WHERE OpName like 'ADMIN%' and RoleName in ('SuperUser','BlueBinPersonnel','BlueBelt')
+
+delete from bluebin.BlueBinRoleOperations where OpID = (select OpID from bluebin.BlueBinOperations where OpName = 'ADMIN-CONFIG') and RoleID in (Select RoleID from bluebin.BlueBinRoles where RoleName in ('SuperUser','BlueBelt'))
+
 
 END
 GO

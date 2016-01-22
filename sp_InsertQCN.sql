@@ -13,7 +13,7 @@ CREATE PROCEDURE sp_InsertQCN
 @Details varchar(max),
 @Updates varchar(max),
 @QCNStatus varchar(255),
-@UserLogin varchar (30)
+@UserLogin varchar (60)
 
 
 --WITH ENCRYPTION

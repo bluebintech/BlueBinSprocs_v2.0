@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCN') an
 drop procedure sp_SelectQCN
 GO
 
---exec sp_SelectQCN '',1
+--exec sp_SelectQCN ''
 CREATE PROCEDURE sp_SelectQCN
 @LocationName varchar(50)
 ,@Completed int
@@ -11,7 +11,6 @@ CREATE PROCEDURE sp_SelectQCN
 AS
 BEGIN
 SET NOCOUNT ON
-declare @Completed int = 0
 declare @QCNStatus int = 0
 declare @QCNStatus2 int = 0
 if @Completed = 0
@@ -32,7 +31,7 @@ select
     v.[Title] as AssignedTitleName,
 	qt.Name as QCNType,
 q.[ItemID],
-di.[ItemClinicalDescription],
+COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description') as ItemClinicalDescription,
 db.[BinQty] as Par,
 db.[BinUOM] as UOM,
 di.[ItemManufacturer],
@@ -57,7 +56,7 @@ left join [bluebin].[BlueBinResource] v on q.AssignedUserID = v.BlueBinResourceI
 inner join [qcn].[QCNType] qt on q.QCNTypeID = qt.QCNTypeID
 inner join [qcn].[QCNStatus] qs on q.QCNStatusID = qs.QCNStatusID
 
-WHERE q.Active = 1  
+WHERE q.Active = 1 and dl.LocationName LIKE '%' + @LocationName + '%' 
 and q.QCNStatusID not in (@QCNStatus,@QCNStatus2)
             order by q.[DateEntered] asc--,convert(int,(getdate() - q.[DateEntered])) desc
 
@@ -65,5 +64,3 @@ END
 GO
 grant exec on sp_SelectQCN to appusers
 GO
-
-select * from qcn.QCN

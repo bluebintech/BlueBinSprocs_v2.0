@@ -1,3 +1,10 @@
+/************************************************************
+
+			DimWarehouseItem
+
+************************************************************/
+
+
 IF EXISTS ( SELECT  *
             FROM    sys.objects
             WHERE   object_id = OBJECT_ID(N'etl_DimWarehouseItem')
@@ -48,13 +55,14 @@ FROM   ITEMLOC a
                   AND a.GL_CATEGORY = c.GL_CATEGORY
 		INNER JOIN bluebin.DimLocation d
 		ON a.LOCATION = d.LocationID
-		INNER JOIN ICLOCATION e
-		ON a.COMPANY = e.COMPANY
-		AND a.LOCATION = e.LOCATION
-WHERE e.LOCATION_TYPE <> 'P'
+--		INNER JOIN ICLOCATION e
+--		ON a.COMPANY = e.COMPANY
+--		AND a.LOCATION = e.LOCATION
+--WHERE e.LOCATION_TYPE <> 'P'
  
 GO
 
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'Warehouse Item'
+GO
